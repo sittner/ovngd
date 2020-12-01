@@ -1,4 +1,4 @@
-OVNG-OVERLAYS
-=============
-Device tree overlays for the OpenVarioNG board.
+OVNGD
+=====
+OpenVarioNG sensor data NMEA server.
 
