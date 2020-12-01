@@ -43,8 +43,8 @@ $(SENSCAL_BIN): $(SENSCAL_OBJ)
 
 install: $(OVNGD_BIN) $(SENSCAL_BIN)
 	mkdir -p /usr/bin
-	cp $(OVNGD_BIN) /usr/bin
-	cp $(SENSCAL_BIN) /usr/bin
+	cp $(OVNGD_BIN) $(TARGET_DIR)/usr/bin
+	cp $(SENSCAL_BIN) $(TARGET_DIR)/usr/bin
 
 # Include the dependency files.
 -include $(shell mkdir -p .dep) $(wildcard .dep/*)
