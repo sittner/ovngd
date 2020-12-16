@@ -18,18 +18,20 @@ static pt1_flt_t p_dyn;
 
 static kalman_flt_t vkf;
 
-// TODO: config
-static int use_tek = 1;
+static int use_tek;
+static double kalman_z_abs;
 
 static inline double computeNoncompVario(double pressure, double d_pressure) {
   return VARIO_FACTOR * pow(pressure, VARIO_EXPONENT) * d_pressure;
 }
 
-void baro_init(void) {
-  // TODO: config
-  pt1_init(&p_stat, 0.5, FLT_PERIOD);
-  pt1_init(&p_dyn, 0.5, FLT_PERIOD);
-  kalman_init(&vkf, FLT_PERIOD, 0.3);
+void baro_init(const OVNGD_CONF_T *conf) {
+  pt1_init(&p_stat, conf->baro_stat_filter_tau, FLT_PERIOD);
+  pt1_init(&p_dyn, conf->baro_dyn_filter_tau, FLT_PERIOD);
+  kalman_init(&vkf, FLT_PERIOD, conf->baro_tek_kalman_x_accel);
+
+  use_tek = conf->baro_use_tek;
+  kalman_z_abs = conf->baro_tek_kalman_z_abs;
 }
 
 void baro_stat_data(double data) {
@@ -39,9 +41,8 @@ void baro_stat_data(double data) {
 }
 
 void baro_tek_data(double data) {
-  // TODO: config
   data += BARO_TEK_OFFSET_HPA;
-  kalman_update(&vkf, data, 0.25);
+  kalman_update(&vkf, data, kalman_z_abs);
   if (use_tek) {
     nmeasrv_broadcast("$POV,E,%0.2f", computeNoncompVario(vkf.x_abs, vkf.x_vel));
   }

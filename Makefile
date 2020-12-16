@@ -1,12 +1,14 @@
 CC ?= gcc
 
 OVNGD_BIN = ovngd
-OVNGD_SRC = main.c ovng_iio.c iio_utils.c ovng_ow.c nmea_server.c baro.c filter.c ahrs.c
+OVNGD_SRC = main.c cfgfile.c ovng_iio.c iio_utils.c ovng_ow.c nmea_server.c baro.c filter.c ahrs.c
 OVNGD_LIBS = -lm -lpthread
 
 SENSCAL_BIN = senscal
 SENSCAL_SRC = senscal.c ovng_iio.c iio_utils.c
 SENSCAL_LIBS = -lm
+
+OVNGD_CONF = ovngd.conf
 
 CFLAGS += -Wall
 CFLAGS += -D_GNU_SOURCE
@@ -41,10 +43,12 @@ $(OVNGD_BIN): $(OVNGD_OBJ)
 $(SENSCAL_BIN): $(SENSCAL_OBJ)
 	$(CC) $(SENSCAL_OBJ) -o $@ $(LDFLAGS) $(SENSCAL_LIBS)
 
-install: $(OVNGD_BIN) $(SENSCAL_BIN)
-	mkdir -p /usr/bin
+install: $(OVNGD_BIN) $(SENSCAL_BIN) $(OVNGD_CONF)
+	mkdir -p $(TARGET_DIR)/usr/bin
 	cp $(OVNGD_BIN) $(TARGET_DIR)/usr/bin
 	cp $(SENSCAL_BIN) $(TARGET_DIR)/usr/bin
+	mkdir -p $(TARGET_DIR)/etc
+	cp $(OVNGD_CONF) $(TARGET_DIR)/etc
 
 # Include the dependency files.
 -include $(shell mkdir -p .dep) $(wildcard .dep/*)

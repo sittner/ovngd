@@ -22,8 +22,6 @@
 #define A_TO_G (1.0 / 9.80665)
 #define SAMPLE_PERIOD (1.0 / (double) IIO_SAMPLE_FREQ)
 
-#define MADG_BETA_DEFLT 0.1
-
 static double beta; // algorithm gain
 
 static vector3d_t g, a, m; // input values
@@ -188,9 +186,7 @@ static inline double get_yaw(void) {
   return atan2(q1*q2 + q0*q3, 0.5 - q2*q2 - q3*q3);
 }
 
-void ahrs_init(void) {
-  beta = MADG_BETA_DEFLT; // TODO: config
-
+void ahrs_init(double beta) {
   vector3d_init(&g);
   vector3d_init(&a);
   vector3d_init(&m);

@@ -10,6 +10,7 @@
 #include <sys/eventfd.h>
 #include <sys/stat.h>
 
+#include "cfgfile.h"
 #include "ovng_iio.h"
 #include "ovng_ow.h"
 #include "nmea_server.h"
@@ -54,12 +55,16 @@ const OVIIO_DATA_CALLBACKS_T callbacks = {
   .imu_done_cb = ahrs_scan_done
 };
 
-int main(void) {
+int main(int argc, char* argv[]) {
   int ret = 1;
   int err;
   struct sigaction act;
   fd_set fds, select_fds;
   uint64_t u;
+  OVNGD_CONF_T conf;
+
+  // try to read config file
+  cfgfile_read(&conf, (argc >= 2) ? argv[1] : NULL);
 
   FD_ZERO(&fds);
 
@@ -80,9 +85,10 @@ int main(void) {
     goto fail_exit_fd;
   }
 
-  // TODO: config
   ovow_init();
-  ovow_temp_add("28-00000829b4a8", "T", proc_ow_temp);
+  if (conf.temp_id[0] != 0) {
+    ovow_temp_add(conf.temp_id, "T", proc_ow_temp);
+  }
   if (ovow_temp_start(&fds)) {
     goto fail_ovow_temp;
   }
@@ -91,8 +97,8 @@ int main(void) {
     goto fail_ovow_temp;
   }
 
-  baro_init();
-  ahrs_init();
+  baro_init(&conf);
+  ahrs_init(conf.ahrs_madg_beta);
 
   while (1) {
     select_fds = fds;
@@ -129,7 +135,6 @@ fail_nmea_server:
   nmeasrv_cleanup();
 fail_ovow_temp:
   ovow_temp_cleanup();
-//fail_oviio:
   oviio_cleanup();
 fail_exit_fd:
   close(exit_fd);

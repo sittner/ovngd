@@ -3,7 +3,9 @@
 
 #include "vector.h"
 
-void ahrs_init(void);
+#define MADG_BETA_DEFLT 0.1
+
+void ahrs_init(double beta);
 
 void ahrs_accel_data(vector3d_t data);
 void ahrs_anglvel_data(vector3d_t data);
