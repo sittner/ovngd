@@ -10,9 +10,6 @@
 
 #define FLT_PERIOD (1.0 / (double) IIO_SAMPLE_FREQ)
 
-#define FLT_STAT_DT 0.5
-#define FLT_DYN_DT 0.5
-
 static pt1_flt_t p_stat;
 static pt1_flt_t p_dyn;
 
