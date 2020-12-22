@@ -40,9 +40,9 @@ void cfgfile_read(OVNGD_CONF_T *conf, const char *filename) {
     return;
   }
 
-  fp = fopen("ovngd.conf", "r");
+  fp = fopen(filename, "r");
   if (fp == NULL) {
-    syslog(LOG_INFO, "Failed to open config file %s. Using defaults.", filename);
+    syslog(LOG_WARNING, "Failed to open config file %s. Using defaults.", filename);
     return;
   }
 
