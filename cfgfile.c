@@ -9,6 +9,8 @@
 #include "ahrs.h"
 
 static const OVNGD_CONF_T default_conf = {
+  .eeprom_path = { 0 },
+
   .temp_id = { 0 },
 
   .baro_use_tek = BARO_USE_TEK,
@@ -74,6 +76,10 @@ void cfgfile_read(OVNGD_CONF_T *conf, const char *filename) {
     }
 
     // parse parameters
+    if (strcmp(name, "EEPROM_PATH") == 0) {
+      strncpy(conf->eeprom_path, value, CFGFILE_PATH_LEN);
+      continue;
+    }
     if (strcmp(name, "TEMP_OW_ID") == 0) {
       strncpy(conf->temp_id, value, CFGFILE_OW_ID_LEN);
       continue;
