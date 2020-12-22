@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 
 #include "cfgfile.h"
+#include "eeprom.h"
 #include "ovng_iio.h"
 #include "ovng_ow.h"
 #include "nmea_server.h"
@@ -65,6 +66,9 @@ int main(int argc, char* argv[]) {
 
   // try to read config file
   cfgfile_read(&conf, (argc >= 2) ? argv[1] : NULL);
+
+  // try to read eeprom data
+  eeprom_init(conf.eeprom_path);
 
   FD_ZERO(&fds);
 

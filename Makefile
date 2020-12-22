@@ -1,7 +1,7 @@
 CC ?= gcc
 
 OVNGD_BIN = ovngd
-OVNGD_SRC = main.c cfgfile.c ovng_iio.c iio_utils.c ovng_ow.c nmea_server.c baro.c filter.c ahrs.c
+OVNGD_SRC = main.c cfgfile.c eeprom.c ovng_iio.c iio_utils.c ovng_ow.c nmea_server.c baro.c filter.c ahrs.c
 OVNGD_LIBS = -lm -lpthread
 
 SENSCAL_BIN = senscal

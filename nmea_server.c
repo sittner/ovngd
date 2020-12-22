@@ -13,10 +13,15 @@
 #include <arpa/inet.h>
 
 #include "nmea_server.h"
+#include "baro.h"
 
 #define OVNG_PORT 4353
 #define MAX_CLIENTS 16
 #define RX_BUF_SIZE 1024
+
+#define BARO_REF_MIN 500.0
+#define BARO_REF_MAX 1500.0
+
 
 typedef struct {
   int fd;
@@ -30,6 +35,9 @@ static CLIENT_DATA_T clients[MAX_CLIENTS];
 
 static CLIENT_DATA_T *find_free_client();
 static void handle_client_data(CLIENT_DATA_T *client);
+static void handle_client_data_calib(CLIENT_DATA_T *client, char *pos);
+static void handle_client_data_calib_baro(CLIENT_DATA_T *client, char *pos);
+static char *next_token(char **pos);
 
 static CLIENT_DATA_T *find_free_client() {
   int i;
@@ -45,6 +53,114 @@ static CLIENT_DATA_T *find_free_client() {
 }
 
 static void handle_client_data(CLIENT_DATA_T *client) {
+  char *line = client->rx_buf;
+  char *pos, *tok;
+  unsigned char csum_rx, csum;
+  char *type;
+
+  // check for start delimiter
+  if (line[0] != '$') {
+    return;
+  }
+  line++;
+
+  // search for csum delimiter
+  pos = strchr(line, '*');
+  if (pos == NULL) {
+    return;
+  }
+
+  // parse received checksum
+  *(pos++) = 0;
+  csum_rx = (unsigned char) strtol(pos, NULL, 16);
+
+  // calculate local checksum
+  for (csum = 0, pos = line; *pos; pos++) {
+    csum ^= *pos;
+  }
+
+  // verify checksum
+  if (csum_rx != csum) {
+    return;
+  }
+
+  // check message prefix
+  pos = line;
+  tok = next_token(&pos);
+  if (tok == NULL || strcmp(tok, "POV") != 0) {
+    return;
+  }
+
+  // get type
+  type = next_token(&pos);
+  if (type == NULL) {
+    return;
+  }
+
+  // dispatch types
+  if (strcmp(type, "C") == 0) {
+    handle_client_data_calib(client, pos);
+    return;
+  }
+}
+
+static void handle_client_data_calib(CLIENT_DATA_T *client, char *pos) {
+  char *subtype;
+
+  // get subtype
+  subtype = next_token(&pos);
+  if (subtype == NULL) {
+    return;
+  }
+
+  // dispatch subtypes
+  if (strcmp(subtype, "B") == 0) {
+    handle_client_data_calib_baro(client, pos);
+    return;
+  }
+}
+
+static void handle_client_data_calib_baro(CLIENT_DATA_T *client, char *pos) {
+  char *s;
+  int baro_autoref;
+  double baro_ref;
+
+  // get baro_ref
+  s = next_token(&pos);
+  if (s == NULL) {
+    // use autoref
+    baro_autoref = 1;
+    baro_ref = 0.0;
+  } else {
+    // verify baro_ref
+    baro_autoref = 0;
+    baro_ref = atof(s);
+    if (baro_ref < BARO_REF_MIN || baro_ref > BARO_REF_MAX) {
+      return;
+    }
+  }
+
+  // start calibration
+  baro_start_calib(baro_autoref, baro_ref);
+}
+
+static char *next_token(char **pos) {
+  char *val, *sep;
+
+  if (*pos == NULL) {
+    return NULL;
+  }
+
+  val = *pos;
+  sep = strchr(val, ',');
+  if (sep == NULL) {
+    *pos = NULL;
+  } else {
+    *sep = 0;
+    *pos = sep + 1;
+  }
+
+  return val;
 }
 
 int nmeasrv_init(fd_set *fds) {
