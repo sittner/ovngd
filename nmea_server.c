@@ -153,6 +153,12 @@ int nmeasrv_task(fd_set *fds, fd_set *select_fds) {
       if (rx_len > 0) {
         // receive data
         for (j = 0, p = rx_buf; j <rx_len; j++, p++) {
+          if (*p == '\b') {
+            if (client->rx_buf_pos > 0) {
+              (client->rx_buf_pos)--;
+            }
+            continue;
+          }
           if (*p == '\r') {
             continue;
           }
