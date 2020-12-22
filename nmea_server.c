@@ -15,11 +15,42 @@
 #include "nmea_server.h"
 
 #define OVNG_PORT 4353
+#define MAX_CLIENTS 16
+#define RX_BUF_SIZE 1024
+
+typedef struct {
+  int fd;
+  struct sockaddr_in addr;
+  char rx_buf[RX_BUF_SIZE];
+  int rx_buf_pos;
+} CLIENT_DATA_T;
 
 static int server_fd = -1;
-static fd_set client_fds;
+static CLIENT_DATA_T clients[MAX_CLIENTS];
+
+static CLIENT_DATA_T *find_free_client();
+static void handle_client_data(CLIENT_DATA_T *client);
+
+static CLIENT_DATA_T *find_free_client() {
+  int i;
+  CLIENT_DATA_T *client;
+
+  for (i=0, client = clients; i<MAX_CLIENTS; i++, client++) {
+    if (client->fd < 0) {
+      return client;
+    }
+  }
+
+  return NULL;
+}
+
+static void handle_client_data(CLIENT_DATA_T *client) {
+}
 
 int nmeasrv_init(fd_set *fds) {
+  int i;
+  CLIENT_DATA_T *client;
+
   server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0) {
     syslog(LOG_ERR, "Could not create socket");
@@ -45,7 +76,10 @@ int nmeasrv_init(fd_set *fds) {
   }
 
   FD_SET(server_fd, fds);
-  FD_ZERO(&client_fds);
+  for (i=0, client = clients; i<MAX_CLIENTS; i++, client++) {
+    memset(client, 0, sizeof(CLIENT_DATA_T));
+    client->fd = -1;
+  }
 
   return 0;
 
@@ -56,12 +90,13 @@ fail0:
 }
 
 void nmeasrv_cleanup() {
-  int cfd;
+  int i;
+  CLIENT_DATA_T *client;
 
   // close client connections
-  for (cfd = 0; cfd < FD_SETSIZE; cfd++) {
-    if (FD_ISSET(cfd, &client_fds)) {
-      close(cfd);
+  for (i=0, client = clients; i<MAX_CLIENTS; i++, client++) {
+    if (client->fd >= 0) {
+      close(client->fd);
     }
   }
 
@@ -69,17 +104,20 @@ void nmeasrv_cleanup() {
   close(server_fd);
 }
 
-int nmeasrv_task(fd_set *select_fds, fd_set *fds) {
+int nmeasrv_task(fd_set *fds, fd_set *select_fds) {
+  int i, j;
+  CLIENT_DATA_T *client;
   int cfd;
   struct sockaddr_in client_addr;
   socklen_t client_addr_size;
   char client_addr_str[INET_ADDRSTRLEN];
   int opt_val;
-  char rx_buf[1024];
+  char rx_buf[RX_BUF_SIZE];
+  char *p;
   ssize_t rx_len;
 
   // handle new connections
-  if (FD_ISSET(server_fd, fds)) {
+  if (FD_ISSET(server_fd, select_fds)) {
     client_addr_size = sizeof(client_addr);
     cfd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_size);
     if (cfd < 0) {
@@ -89,27 +127,50 @@ int nmeasrv_task(fd_set *select_fds, fd_set *fds) {
 
     client_addr_str[0] = 0;
     inet_ntop(AF_INET, &client_addr.sin_addr, client_addr_str, sizeof(client_addr_str));
-    syslog(LOG_INFO, "connect from host %s, port %u.\n", client_addr_str, ntohs(client_addr.sin_port));
 
-    opt_val = 1;
-    setsockopt(cfd, IPPROTO_TCP, TCP_NODELAY, &opt_val, sizeof opt_val);
+    client = find_free_client();
+    if (client == NULL) {
+      syslog(LOG_INFO, "reject connect from host %s, port %u. Maximim client connections exceeded.", client_addr_str, ntohs(client_addr.sin_port));
+      close(cfd);
+    } else {
+      syslog(LOG_INFO, "connect from host %s, port %u.", client_addr_str, ntohs(client_addr.sin_port));
 
-    FD_SET(cfd, select_fds);
-    FD_SET(cfd, &client_fds);
+      opt_val = 1;
+      setsockopt(cfd, IPPROTO_TCP, TCP_NODELAY, &opt_val, sizeof opt_val);
+
+      memset(client, 0, sizeof(CLIENT_DATA_T));
+      client->fd = cfd;
+      client->addr = client_addr;
+      FD_SET(cfd, fds);
+    }
   }
 
-  // process client fds
-  for (cfd = 0; cfd < FD_SETSIZE; cfd++) {
-    if (FD_ISSET(cfd, &client_fds) && FD_ISSET(cfd, fds)) {
+  // process clients
+  for (i=0, client = clients; i<MAX_CLIENTS; i++, client++) {
+    if (client->fd >= 0 && FD_ISSET(client->fd, select_fds)) {
       // read data from client
-      rx_len = read(cfd, rx_buf, sizeof(rx_buf));
+      rx_len = read(client->fd, rx_buf, sizeof(rx_buf));
       if (rx_len > 0) {
-        // ignore data
+        // receive data
+        for (j = 0, p = rx_buf; j <rx_len; j++, p++) {
+          if (*p == '\r') {
+            continue;
+          }
+          if (*p == '\n') {
+            client->rx_buf[client->rx_buf_pos] = 0;
+            client->rx_buf_pos = 0;
+            handle_client_data(client);
+            continue;
+          }
+          if (client->rx_buf_pos < (RX_BUF_SIZE - 1)) {
+            client->rx_buf[(client->rx_buf_pos)++] = *p;
+          }
+        }
       } else {
         // close connection
-        close(cfd);        
-        FD_CLR(cfd, select_fds);
-        FD_CLR(cfd, &client_fds);
+        close(client->fd);
+        FD_CLR(client->fd, fds);
+        client->fd = -1;
       }
     }
   }
@@ -122,7 +183,9 @@ int nmeasrv_broadcast(const char *fmt, ...) {
   char msg[256];
   unsigned char cs;
   char *p;
-  int cfd, len;
+  int len;
+  int i;
+  CLIENT_DATA_T *client;
 
   // generate formatted message
   va_start(ap, fmt);
@@ -153,9 +216,9 @@ int nmeasrv_broadcast(const char *fmt, ...) {
   len += sprintf(p, "*%02X\n", cs);
 
   // send to all clients
-  for (cfd = 0; cfd < FD_SETSIZE; cfd++) {
-    if (FD_ISSET(cfd, &client_fds)) {
-      write(cfd, msg, len);
+  for (i=0, client = clients; i<MAX_CLIENTS; i++, client++) {
+    if (client->fd >= 0) {
+      write(client->fd, msg, len);
     }
   }
 
