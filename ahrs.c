@@ -186,7 +186,8 @@ static inline double get_yaw(void) {
   return atan2(q1*q2 + q0*q3, 0.5 - q2*q2 - q3*q3);
 }
 
-void ahrs_init(double beta) {
+void ahrs_init(double _beta) {
+  beta = _beta;
   vector3d_init(&g);
   vector3d_init(&a);
   vector3d_init(&m);
