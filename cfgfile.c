@@ -13,14 +13,18 @@ static const OVNGD_CONF_T default_conf = {
 
   .temp_id = { 0 },
 
-  .baro_use_tek = BARO_USE_TEK,
-  .baro_stat_filter_tau = BARO_STAT_FILTER_TAU,
-  .baro_dyn_filter_tau = BARO_DYN_FILTER_TAU,
-  .baro_tek_kalman_x_accel = BARO_TEK_KALMAN_X_ACCEL,
-  .baro_tek_kalman_z_abs = BARO_TEK_KALMAN_Z_ABS,
+  .baro = {
+    .use_tek = BARO_USE_TEK,
+    .stat_filter_tau = BARO_STAT_FILTER_TAU,
+    .dyn_filter_tau = BARO_DYN_FILTER_TAU,
+    .tek_kalman_x_accel = BARO_TEK_KALMAN_X_ACCEL,
+    .tek_kalman_z_abs = BARO_TEK_KALMAN_Z_ABS
+  },
 
-  .ahrs_madg_beta = MADG_BETA_DEFLT,
-  .ahrs_send_raw = 0
+  .ahrs = {
+    .madg_beta = MADG_BETA_DEFLT,
+    .send_raw = 0
+  }
 };
 
 static const char *trim_chars = " \t\r\n";
@@ -86,31 +90,31 @@ void cfgfile_read(OVNGD_CONF_T *conf, const char *filename) {
       continue;
     }
     if (strcmp(name, "BARO_USE_TEK") == 0) {
-      conf->baro_use_tek = !!atoi(value);
+      conf->baro.use_tek = !!atoi(value);
       continue;
     }
     if (strcmp(name, "BARO_STAT_FILTER_TAU") == 0) {
-      conf->baro_stat_filter_tau = atof(value);
+      conf->baro.stat_filter_tau = atof(value);
       continue;
     }
     if (strcmp(name, "BARO_DYN_FILTER_TAU") == 0) {
-      conf->baro_dyn_filter_tau = atof(value);
+      conf->baro.dyn_filter_tau = atof(value);
       continue;
     }
     if (strcmp(name, "BARO_TEK_KALMAN_X_ACCEL") == 0) {
-      conf->baro_tek_kalman_x_accel = atof(value);
+      conf->baro.tek_kalman_x_accel = atof(value);
       continue;
     }
     if (strcmp(name, "BARO_TEK_KALMAN_Z_ABS") == 0) {
-      conf->baro_tek_kalman_z_abs = atof(value);
+      conf->baro.tek_kalman_z_abs = atof(value);
       continue;
     }
     if (strcmp(name, "AHRS_MADG_BETA") == 0) {
-      conf->ahrs_madg_beta = atof(value);
+      conf->ahrs.madg_beta = atof(value);
       continue;
     }
     if (strcmp(name, "AHRS_SEND_RAW") == 0) {
-      conf->ahrs_send_raw = !!atoi(value);
+      conf->ahrs.send_raw = !!atoi(value);
       continue;
     }
   }

@@ -116,13 +116,13 @@ static double computeNoncompVario(double pressure, double d_pressure) {
   return VARIO_FACTOR * pow(pressure, VARIO_EXPONENT) * d_pressure;
 }
 
-void baro_init(const OVNGD_CONF_T *conf) {
-  pt1_init(&p_stat, conf->baro_stat_filter_tau, FLT_PERIOD);
-  pt1_init(&p_dyn, conf->baro_dyn_filter_tau, FLT_PERIOD);
-  kalman_init(&vkf, FLT_PERIOD, conf->baro_tek_kalman_x_accel);
+void baro_init(const BARO_CONF_T *conf) {
+  pt1_init(&p_stat, conf->stat_filter_tau, FLT_PERIOD);
+  pt1_init(&p_dyn, conf->dyn_filter_tau, FLT_PERIOD);
+  kalman_init(&vkf, FLT_PERIOD, conf->tek_kalman_x_accel);
 
-  use_tek = conf->baro_use_tek;
-  kalman_z_abs = conf->baro_tek_kalman_z_abs;
+  use_tek = conf->use_tek;
+  kalman_z_abs = conf->tek_kalman_z_abs;
 
   calib_init(0, 0, 0.0);
 }

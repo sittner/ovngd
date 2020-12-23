@@ -188,9 +188,9 @@ static inline double get_yaw(void) {
   return atan2(q1*q2 + q0*q3, 0.5 - q2*q2 - q3*q3);
 }
 
-void ahrs_init(double _beta, int _send_raw) {
-  beta = _beta;
-  send_raw = _send_raw;
+void ahrs_init(const AHRS_CONF_T *conf) {
+  beta = conf->madg_beta;
+  send_raw = conf->send_raw;
 
   vector3d_init(&g);
   vector3d_init(&a);

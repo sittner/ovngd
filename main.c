@@ -101,8 +101,8 @@ int main(int argc, char* argv[]) {
     goto fail_ovow_temp;
   }
 
-  baro_init(&conf);
-  ahrs_init(conf.ahrs_madg_beta, conf.ahrs_send_raw);
+  baro_init(&conf.baro);
+  ahrs_init(&conf.ahrs);
 
   while (1) {
     select_fds = fds;
