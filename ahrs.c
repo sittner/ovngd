@@ -23,7 +23,9 @@
 #define SAMPLE_PERIOD (1.0 / (double) IIO_SAMPLE_FREQ)
 
 static double beta; // algorithm gain
+static int send_raw; // send raw data
 
+static vector3d_t g_raw, a_raw, m_raw; // raw input values
 static vector3d_t g, a, m; // input values
 
 static double q0, q1, q2, q3; // quaternion of sensor frame relative to auxiliary frame
@@ -186,8 +188,10 @@ static inline double get_yaw(void) {
   return atan2(q1*q2 + q0*q3, 0.5 - q2*q2 - q3*q3);
 }
 
-void ahrs_init(double _beta) {
+void ahrs_init(double _beta, int _send_raw) {
   beta = _beta;
+  send_raw = _send_raw;
+
   vector3d_init(&g);
   vector3d_init(&a);
   vector3d_init(&m);
@@ -201,6 +205,8 @@ void ahrs_init(double _beta) {
 }
 
 void ahrs_accel_data(vector3d_t data) {
+  a_raw = data;
+
   // noarmalize vector
   double mag = vector3d_mag(data);
   if (mag > 0.0) {
@@ -214,11 +220,15 @@ void ahrs_accel_data(vector3d_t data) {
 }
 
 void ahrs_anglvel_data(vector3d_t data) {
+  g_raw = data;
+
   // TODO: why negative??
   g = vector3d_scale(data, -1.0);
 }
 
 void ahrs_magn_data(vector3d_t data) {
+  m_raw = data;
+
   data.x -= 0.853;  // 0 deg
   data.y -= -1.223; // -90 deg
   data.z -= -0.121; // ???
@@ -230,28 +240,18 @@ void ahrs_magn_data(vector3d_t data) {
   } else {
     vector3d_init(&m);
   }
-
-/*
-printf("(%+06.3f %+06.3f %+06.3f) -> %.3f\n",
-  m.x, m.y, m.z,
-atan2(tmp.x, tmp.y) * RAD_TO_DEGREE);
-*/
-
 }
 
 void ahrs_scan_done(void) {
+  if (send_raw) {
+    nmeasrv_broadcast("$POV,A,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f",
+      a_raw.x, a_raw.y, a_raw.z,
+      g_raw.x, g_raw.y, g_raw.z,
+      m_raw.x, m_raw.y, m_raw.z);
+  }
+
   madgwick_update();
-/*
-printf("(%+06.3f %+06.3f %+06.3f) (%+06.1f %+06.1f %+06.1f) (%+06.3f %+06.3f %+06.3f) -> %+06.1f %+06.1f %+06.1f %+06.1f\n",
-  a.x, a.y, a.z,
-  g.x * RAD_TO_DEGREE, g.y * RAD_TO_DEGREE, g.z * RAD_TO_DEGREE,
-  m.x, m.y, m.z,
-atan2(m.y, m.x) * RAD_TO_DEGREE,
-    get_roll() * RAD_TO_DEGREE,
-    get_pitch() * RAD_TO_DEGREE,
-    get_yaw() * RAD_TO_DEGREE
-);
-*/
+
   nmeasrv_broadcast("$POV,b,%0.2f,p,%0.2f,h,%0.2f,g,%0.2f",
     get_roll() * RAD_TO_DEGREE,
     get_pitch() * RAD_TO_DEGREE,

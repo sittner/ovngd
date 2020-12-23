@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
   }
 
   baro_init(&conf);
-  ahrs_init(conf.ahrs_madg_beta);
+  ahrs_init(conf.ahrs_madg_beta, conf.ahrs_send_raw);
 
   while (1) {
     select_fds = fds;

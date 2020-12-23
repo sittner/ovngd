@@ -19,7 +19,8 @@ static const OVNGD_CONF_T default_conf = {
   .baro_tek_kalman_x_accel = BARO_TEK_KALMAN_X_ACCEL,
   .baro_tek_kalman_z_abs = BARO_TEK_KALMAN_Z_ABS,
 
-  .ahrs_madg_beta = MADG_BETA_DEFLT
+  .ahrs_madg_beta = MADG_BETA_DEFLT,
+  .ahrs_send_raw = 0
 };
 
 static const char *trim_chars = " \t\r\n";
@@ -106,6 +107,10 @@ void cfgfile_read(OVNGD_CONF_T *conf, const char *filename) {
     }
     if (strcmp(name, "AHRS_MADG_BETA") == 0) {
       conf->ahrs_madg_beta = atof(value);
+      continue;
+    }
+    if (strcmp(name, "AHRS_SEND_RAW") == 0) {
+      conf->ahrs_send_raw = !!atoi(value);
       continue;
     }
   }

@@ -16,6 +16,7 @@ typedef struct {
   double baro_tek_kalman_z_abs;
 
   double ahrs_madg_beta;
+  int ahrs_send_raw;
 } OVNGD_CONF_T;
 
 void cfgfile_read(OVNGD_CONF_T *conf, const char *filename);
