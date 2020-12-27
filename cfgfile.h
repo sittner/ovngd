@@ -13,7 +13,6 @@ typedef struct {
 } BARO_CONF_T;
 
 typedef struct {
-  double madg_beta;
   int send_raw;
 } AHRS_CONF_T;
 

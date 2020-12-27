@@ -22,7 +22,6 @@ static const OVNGD_CONF_T default_conf = {
   },
 
   .ahrs = {
-    .madg_beta = MADG_BETA_DEFLT,
     .send_raw = 0
   }
 };
@@ -107,10 +106,6 @@ void cfgfile_read(OVNGD_CONF_T *conf, const char *filename) {
     }
     if (strcmp(name, "BARO_TEK_KALMAN_Z_ABS") == 0) {
       conf->baro.tek_kalman_z_abs = atof(value);
-      continue;
-    }
-    if (strcmp(name, "AHRS_MADG_BETA") == 0) {
-      conf->ahrs.madg_beta = atof(value);
       continue;
     }
     if (strcmp(name, "AHRS_SEND_RAW") == 0) {
