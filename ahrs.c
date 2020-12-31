@@ -10,6 +10,10 @@
 #define A_TO_G (1.0 / CF_GRAVITY)
 #define SAMPLE_PERIOD (1.0 / (double) IIO_SAMPLE_FREQ)
 
+// https://wiki.paparazziuav.org/wiki/ImuCalibration
+// https://github.com/shannon112/imu_calibration
+// https%3A%2F%2Fwww.evernote.com%2Fshard%2Fs315%2Fsh%2F988c52e5-8ad9-405e-a416-c2c17d7996ef%2F65b6d82d47a45cdd&title=%255BIMU%255D%2Bcalibration%2BRazor-AHRS%252Frazor-9dof-ahrs
+
 static int send_raw; // send raw data
 static vector3d_t a, w, m; // raw input values
 static double gload;
@@ -30,12 +34,15 @@ void ahrs_init(const AHRS_CONF_T *conf) {
 void ahrs_accel_data(vector3d_t data) {
   a = data;
 
+  // TODO: offset/scale calib
+
   // set gload
   double mag = vector3d_mag(data);
   gload = A_TO_G * ((data.z < 0.0) ? -mag : mag);
 }
 
 void ahrs_anglvel_data(vector3d_t data) {
+  // TODO: offset calib
   // TODO: why negative??
   w = vector3d_scale(data, -1.0);
 }
@@ -56,6 +63,8 @@ void ahrs_scan_done(void) {
   cfUpdateMag(&filter, a, w, m, SAMPLE_PERIOD);
 
   quaternion_t pos = cfGetOrientation(&filter);
+
+  // TODO
   double roll = atan2(pos.q0*pos.q1 + pos.q2*pos.q3, 0.5 - pos.q1*pos.q1 - pos.q2*pos.q2);
   double pitch = asin(-2.0 * (pos.q1*pos.q3 - pos.q0*pos.q2));
   double yaw = atan2(pos.q1*pos.q2 + pos.q0*pos.q3, 0.5 - pos.q2*pos.q2 - pos.q3*pos.q3);

@@ -97,10 +97,10 @@ quaternion_t getPrediction(CF_DATA_T *cf, vector3d_t w, double dt)
   w_unb = vector3d_sub(w, cf->w_bias);
 
   quaternion_t pred;
-  pred.q0 = cf->q.q0 + 0.5 * dt * ( w_unb.x * cf->q.q1 + w_unb.y * cf->q.q2 + w_unb.z * cf->q.q3);
-  pred.q1 = cf->q.q1 + 0.5 * dt * (-w_unb.x * cf->q.q0 - w_unb.y * cf->q.q3 + w_unb.z * cf->q.q2);
-  pred.q2 = cf->q.q2 + 0.5 * dt * ( w_unb.x * cf->q.q3 - w_unb.y * cf->q.q0 - w_unb.z * cf->q.q1);
-  pred.q3 = cf->q.q3 + 0.5 * dt * (-w_unb.x * cf->q.q2 + w_unb.y * cf->q.q1 - w_unb.z * cf->q.q0);
+  pred.q0 = cf->pos.q0 + 0.5 * dt * ( w_unb.x * cf->pos.q1 + w_unb.y * cf->pos.q2 + w_unb.z * cf->pos.q3);
+  pred.q1 = cf->pos.q1 + 0.5 * dt * (-w_unb.x * cf->pos.q0 - w_unb.y * cf->pos.q3 + w_unb.z * cf->pos.q2);
+  pred.q2 = cf->pos.q2 + 0.5 * dt * ( w_unb.x * cf->pos.q3 - w_unb.y * cf->pos.q0 - w_unb.z * cf->pos.q1);
+  pred.q3 = cf->pos.q3 + 0.5 * dt * (-w_unb.x * cf->pos.q2 + w_unb.y * cf->pos.q1 - w_unb.z * cf->pos.q0);
 
   return quaternion_normalize(pred);
 }
@@ -252,7 +252,7 @@ void cfInit(CF_DATA_T *cf) {
   cf->do_adaptive_gain = false;
   cf->initialized = false;
   cf->steady_state = false;
-  quaternion_init(&cf->q);
+  quaternion_init(&cf->pos);
   vector3d_init(&cf->w_prev);
   vector3d_init(&cf->w_bias);
 }
@@ -289,20 +289,20 @@ bool cfSetBiasAlpha(CF_DATA_T *cf, double bias_alpha)
 void cfSetOrientation(CF_DATA_T *cf, quaternion_t q)
 {
   // Set the state to inverse (state is fixed wrt body).
-  cf->q = quaternion_invert(q);
+  cf->pos = quaternion_invert(q);
 }
 
 quaternion_t cfGetOrientation(CF_DATA_T *cf)
 {
   // Return the inverse of the state (state is fixed wrt body).
-  return quaternion_invert(cf->q);
+  return quaternion_invert(cf->pos);
 }
 
 void cfUpdate(CF_DATA_T *cf, vector3d_t a, vector3d_t w, double dt)
 {
   if (cf->initialized) {
     // First time - ignore prediction:
-    cf->q = getMeasurement(a);
+    cf->pos = getMeasurement(a);
     cf->initialized = true;
     return;
   }
@@ -331,14 +331,14 @@ void cfUpdate(CF_DATA_T *cf, vector3d_t a, vector3d_t w, double dt)
 
   acc = scaleQuaternion(gain, acc);
 
-  cf->q = quaternion_normalize(quaternion_multiply(pred, acc));
+  cf->pos = quaternion_normalize(quaternion_multiply(pred, acc));
 }
 
 void cfUpdateMag(CF_DATA_T *cf, vector3d_t a, vector3d_t w, vector3d_t m, double dt)
 {
   if (cf->initialized) {
     // First time - ignore prediction:
-    cf->q = getMeasurementMag(a, m);
+    cf->pos = getMeasurementMag(a, m);
     cf->initialized = true;
     return;
   }
@@ -372,6 +372,6 @@ void cfUpdateMag(CF_DATA_T *cf, vector3d_t a, vector3d_t w, vector3d_t m, double
   quaternion_t mag;
   mag = scaleQuaternion(cf->gain_mag, getMagCorrection(m, temp));
 
-  cf->q = quaternion_normalize(quaternion_multiply(temp, mag));
+  cf->pos = quaternion_normalize(quaternion_multiply(temp, mag));
 }
 

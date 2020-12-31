@@ -29,7 +29,7 @@ typedef struct {
 
   // The orientation as a Hamilton quaternion (q0 is the scalar). Represents
   // the orientation of the fixed frame wrt the body frame.
-  quaternion_t q;
+  quaternion_t pos;
 
   // Bias in angular velocities
   vector3d_t w_prev;
