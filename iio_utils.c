@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <endian.h>
 #include <math.h>
+#include <syslog.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -163,7 +164,7 @@ static int get_channel_type(unsigned *is_signed, unsigned *bytes, unsigned *bits
 			sysfsfp = fopen(filename, "r");
 			if (!sysfsfp) {
 				ret = -errno;
-				fprintf(stderr, "failed to open %s\n",
+				syslog(LOG_ERR, "failed to open %s",
 					filename);
 				goto error_free_filename;
 			}
@@ -176,13 +177,11 @@ static int get_channel_type(unsigned *is_signed, unsigned *bytes, unsigned *bits
 				     &padint, shift);
 			if (ret < 0) {
 				ret = -errno;
-				fprintf(stderr,
-					"failed to pass scan type description\n");
+				syslog(LOG_ERR, "failed to pass scan type description");
 				goto error_close_sysfsfp;
 			} else if (ret != 5) {
 				ret = -EIO;
-				fprintf(stderr,
-					"scan type description didn't match\n");
+				syslog(LOG_ERR, "scan type description didn't match");
 				goto error_close_sysfsfp;
 			}
 
@@ -196,7 +195,7 @@ static int get_channel_type(unsigned *is_signed, unsigned *bytes, unsigned *bits
 			*is_signed = (signchar == 's');
 			if (fclose(sysfsfp)) {
 				ret = -errno;
-				fprintf(stderr, "Failed to close %s\n",
+				syslog(LOG_ERR, "Failed to close %s",
 					filename);
 				goto error_free_filename;
 			}
@@ -216,7 +215,7 @@ static int get_channel_type(unsigned *is_signed, unsigned *bytes, unsigned *bits
 error_close_sysfsfp:
 	if (sysfsfp)
 		if (fclose(sysfsfp))
-			perror("get_channel_type(): Failed to close file");
+			syslog(LOG_ERR, "get_channel_type(): Failed to close file");
 
 error_free_filename:
 	if (filename)
@@ -224,7 +223,7 @@ error_free_filename:
 
 error_closedir:
 	if (closedir(dp) == -1)
-		perror("get_channel_type(): Failed to close directory");
+		syslog(LOG_ERR, "get_channel_type(): Failed to close directory");
 
 error_free_builtname_generic:
 	free(builtname_generic);
@@ -303,7 +302,7 @@ error_free_filename:
 
 error_closedir:
 	if (closedir(dp) == -1)
-		perror("get_param_double(): Failed to close directory");
+		syslog(LOG_ERR, "get_param_double(): Failed to close directory");
 
 error_free_builtname_generic:
 	free(builtname_generic);
@@ -400,7 +399,7 @@ int iioutils_find_by_name(const char *name, enum IIOUTILS_TYPE type, int match_o
 
 	dp = opendir(iio_dir);
 	if (!dp) {
-		fprintf(stderr, "No industrialio devices available\n");
+		syslog(LOG_ERR, "No IIO devices available");
 		return -ENODEV;
 	}
 
@@ -413,13 +412,11 @@ int iioutils_find_by_name(const char *name, enum IIOUTILS_TYPE type, int match_o
 			ret = sscanf(ent->d_name + typelen, "%d", &number);
 			if (ret < 0) {
 				ret = -errno;
-				fprintf(stderr,
-					"failed to read element number\n");
+				syslog(LOG_ERR, "failed to read element number");
 				goto error_close_dir;
 			} else if (ret != 1) {
 				ret = -EIO;
-				fprintf(stderr,
-					"failed to match element number\n");
+				syslog(LOG_ERR, "failed to match element number");
 				goto error_close_dir;
 			}
 
@@ -469,7 +466,7 @@ int iioutils_find_by_name(const char *name, enum IIOUTILS_TYPE type, int match_o
 
 error_close_dir:
 	if (closedir(dp) == -1)
-		perror("iioutils_find_by_name(): Failed to close directory");
+		syslog(LOG_ERR, "iioutils_find_by_name(): Failed to close directory");
 
 	return ret;
 }
@@ -496,14 +493,14 @@ int iioutils_write_string(enum IIOUTILS_TYPE type, int index, const char *attr, 
 	sysfsfp = fopen(temp, "w");
 	if (!sysfsfp) {
 		ret = -errno;
-		fprintf(stderr, "Could not open %s\n", temp);
+		syslog(LOG_ERR, "Could not open %s", temp);
 		goto error_free;
 	}
 
 	ret = fprintf(sysfsfp, "%s", val);
 	if (ret < 0) {
 		if (fclose(sysfsfp))
-			perror("iioutils_write_string(): Failed to close dir");
+			syslog(LOG_ERR, "iioutils_write_string(): Failed to close file");
 
 		goto error_free;
 	}
@@ -580,7 +577,7 @@ int iioutils_read_string(enum IIOUTILS_TYPE type, int index, const char *attr, c
 	if (ret < 0 || ret >= IIOUTILS_MAX_VAL_LENGTH) {
 		ret = errno ? -errno : -ENODATA;
 		if (fclose(sysfsfp))
-			perror("iioutils_read_string(): Failed to close dir");
+			syslog(LOG_ERR, "iioutils_read_string(): Failed to close file");
 
 		goto error_free;
 	}
@@ -761,7 +758,7 @@ int iioutils_build_channel_array(enum IIOUTILS_TYPE type, int index,
 			if (fscanf(sysfsfp, "%i", &ret) != 1) {
 				ret = errno ? -errno : -ENODATA;
 				if (fclose(sysfsfp))
-					perror("iioutils_build_channel_array(): Failed to close file");
+					syslog(LOG_ERR, "iioutils_build_channel_array(): Failed to close file");
 
 				free(filename);
 				goto error_close_dir;
@@ -864,7 +861,7 @@ int iioutils_build_channel_array(enum IIOUTILS_TYPE type, int index,
 			sysfsfp = fopen(filename, "r");
 			if (!sysfsfp) {
 				ret = -errno;
-				fprintf(stderr, "failed to open %s\n",
+				syslog(LOG_ERR, "failed to open %s",
 					filename);
 				free(filename);
 				goto error_cleanup_array;
@@ -874,7 +871,7 @@ int iioutils_build_channel_array(enum IIOUTILS_TYPE type, int index,
 			if (fscanf(sysfsfp, "%u", &current->index) != 1) {
 				ret = errno ? -errno : -ENODATA;
 				if (fclose(sysfsfp))
-					perror("iioutils_build_channel_array(): Failed to close file");
+					syslog(LOG_ERR, "iioutils_build_channel_array(): Failed to close file");
 
 				free(filename);
 				goto error_cleanup_array;
@@ -940,7 +937,7 @@ error_cleanup_array:
 error_close_dir:
 	if (dp)
 		if (closedir(dp) == -1)
-			perror("iioutils_build_channel_array(): Failed to close dir");
+			syslog(LOG_ERR, "iioutils_build_channel_array(): Failed to close directory");
 
 error_free_name:
 	free(scan_el_dir);

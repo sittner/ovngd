@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+#include <syslog.h>
 #include <sys/timerfd.h>
 
 #include "ovng_iio.h"
@@ -243,7 +244,7 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
     // create hrt triggers as needed
     if (desc->trigger_freq > 0) {
       if (iioutils_create_hrt_trigger(desc->name)) {
-        fprintf(stderr, "ERROR: unable to create trigger '%s'.\n", desc->name);
+        syslog(LOG_ERR, "Unable to create trigger '%s'.", desc->name);
         goto fail0;
       }
     }
@@ -258,7 +259,7 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
     // search device
     idx = iioutils_find_by_name(desc->name, desc->type, desc->match_of_name);
     if (idx < 0) {
-      fprintf(stderr, "ERROR: IIO device '%s' not found.\n", desc->name);
+      syslog(LOG_ERR, "IIO device '%s' not found.", desc->name);
       continue;
     }
     dev->index = idx;
@@ -270,14 +271,14 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
 
     if (desc->trigger_freq > 0) {
       if (iioutils_write_int(desc->type, dev->index, "sampling_frequency", desc->trigger_freq) < 0) {
-        fprintf(stderr, "ERROR: Unable to set sampling_frequency for trigger '%s'.\n", desc->name);
+        syslog(LOG_ERR, "Unable to set sampling_frequency for trigger '%s'.", desc->name);
         goto fail0;
       }
     }
 
     for (init = desc->init; init != NULL && init->attr != NULL; init++) {
       if (iioutils_write_string(desc->type, dev->index, init->attr, init->val) < 0) {
-        fprintf(stderr, "ERROR: Unable to write init attribute '%s' for device '%s'.\n",
+        syslog(LOG_ERR, "Unable to write init attribute '%s' for device '%s'.",
           init->attr, desc->name);
         goto fail0;
       }
@@ -285,7 +286,7 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
 
     if (desc->mnt_mtx != NULL) {
       if (iioutils_read_mount_matrix(desc->type, dev->index, desc->mnt_mtx) < 0) {
-        fprintf(stderr, "WARNING: Unable to read mount_matrix for device '%s'. Using 1:1 mapping.\n",
+        syslog(LOG_WARNING, "Unable to read mount_matrix for device '%s'. Using 1:1 mapping.",
           desc->name);
       }
     }
@@ -306,7 +307,7 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
       if (cd->ch1d != NULL) {
         idx++;
         if (oviio_enable_1d_channel(dev, cd->name) < 0) {
-          fprintf(stderr, "ERROR: Unable to enable 1d channel '%s' on device '%s'.\n",
+          syslog(LOG_ERR, "Unable to enable 1d channel '%s' on device '%s'.",
             cd->name, desc->name);
           goto fail1;
         }
@@ -315,7 +316,7 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
       if (cd->ch3d != NULL) {
         idx++;
         if (oviio_enable_3d_channel(dev, cd->name) < 0) {
-          fprintf(stderr, "ERROR: Unable to enable 3d channel '%s' on device '%s'.\n",
+          syslog(LOG_ERR, "Unable to enable 3d channel '%s' on device '%s'.",
             cd->name, desc->name);
           goto fail1;
         }
@@ -329,7 +330,7 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
 
     // build channel array for device
     if (iioutils_build_channel_array(desc->type, dev->index, &dev->ci_array, &dev->ci_count) < 0) {
-      fprintf(stderr, "ERROR: Unable read channel info for device '%s'.\n", desc->name);
+      syslog(LOG_ERR, "Unable read channel info for device '%s'.", desc->name);
       goto fail1;
     }
 
@@ -337,7 +338,7 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
     for (cd = desc->cd; cd->name != NULL; cd++) {
       if (cd->ch1d != NULL) {
         if (oviio_find_1d_channel(dev, cd->ch1d, cd->name) < 0) {
-          fprintf(stderr, "ERROR: Unable to find 1d channel '%s' on device '%s'.\n",
+          syslog(LOG_ERR, "Unable to find 1d channel '%s' on device '%s'.",
             cd->name, desc->name);
           goto fail1;
         }
@@ -345,7 +346,7 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
 
       if (cd->ch3d != NULL) {
         if (oviio_find_3d_channel(dev, cd->ch3d, cd->name) < 0) {
-          fprintf(stderr, "ERROR: Unable to find 3d channel '%s' on device '%s'.\n",
+          syslog(LOG_ERR, "Unable to find 3d channel '%s' on device '%s'.",
             cd->name, desc->name);
           goto fail1;
         }
@@ -364,23 +365,23 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
     // set trigger
     if (desc->trigger != NULL) {
       if (iioutils_read_string(desc->trigger->desc->type, desc->trigger->index, "name", buf) < 0) {
-        fprintf(stderr, "ERROR: Unable to get trigger name for device '%s'.\n", desc->name);
+        syslog(LOG_ERR, "Unable to get trigger name for device '%s'.", desc->name);
         goto fail1;
       }
 
       if (iioutils_write_string(desc->type, dev->index, "trigger/current_trigger", buf) < 0) {
-        fprintf(stderr, "ERROR: Unable to set trigger for device '%s'.\n", desc->name);
+        syslog(LOG_ERR, "Unable to set trigger for device '%s'.", desc->name);
         goto fail1;
       }
     }
 
     // enable buffer
     if (iioutils_write_int(desc->type, dev->index, "buffer/length", 2) < 0) {
-      fprintf(stderr, "ERROR: Unable to enable buffer for device '%s'.\n", desc->name);
+      syslog(LOG_ERR, "Unable to enable buffer for device '%s'.", desc->name);
       goto fail1;
     }
     if (iioutils_write_int(desc->type, dev->index, "buffer/enable", 1) < 0) {
-      fprintf(stderr, "ERROR: Unable to enable buffer for device '%s'.\n", desc->name);
+      syslog(LOG_ERR, "Unable to enable buffer for device '%s'.", desc->name);
       goto fail1;
     }
 
@@ -388,7 +389,7 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
     dev->scan_size = iioutils_get_scan_size(dev->ci_array, dev->ci_count);
     dev->buffer = malloc(dev->scan_size);
     if (dev->buffer == NULL) {
-      fprintf(stderr, "ERROR: Unable to alloc buffer for device '%s'.\n", desc->name);
+      syslog(LOG_ERR, "Unable to alloc buffer for device '%s'.", desc->name);
       goto fail1;
     }
 
@@ -396,7 +397,7 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
     snprintf(buf, sizeof(buf), "/dev/iio:device%d", dev->index);
     dev->buffer_fd = open(buf, O_RDONLY | O_NONBLOCK);
     if (dev->buffer_fd < 0) {
-      fprintf(stderr, "ERROR: Unable to open buffer access for device '%s'.\n", desc->name);
+      syslog(LOG_ERR, "Unable to open buffer access for device '%s'.", desc->name);
       goto fail1;
     }
 
@@ -408,7 +409,7 @@ int oviio_init(fd_set *fds, const OVIIO_DATA_CALLBACKS_T *callbacks, int direct_
   if (direct_period > 0) {
     direct_timer = create_timer(direct_period);
     if (direct_timer < 0) {
-      fprintf(stderr, "ERROR: Unable to create timer fd for direct iio polling.\n");
+      syslog(LOG_ERR, "Unable to create timer fd for direct iio polling.");
       goto fail1;
     }
     FD_SET(direct_timer, fds);

@@ -30,10 +30,14 @@ typedef struct {
   int rx_buf_pos;
 } CLIENT_DATA_T;
 
+static fd_set *main_fds;
 static int server_fd = -1;
 static CLIENT_DATA_T clients[MAX_CLIENTS];
 
 static CLIENT_DATA_T *find_free_client();
+static CLIENT_DATA_T *accept_client(struct sockaddr_in client_addr, int cfd);
+static void disconnect_client(CLIENT_DATA_T * client);
+static int read_client_data(CLIENT_DATA_T *client);
 static void handle_client_data(CLIENT_DATA_T *client);
 static void handle_client_data_calib(CLIENT_DATA_T *client, char *pos);
 static void handle_client_data_calib_baro(CLIENT_DATA_T *client, char *pos);
@@ -43,13 +47,92 @@ static CLIENT_DATA_T *find_free_client() {
   int i;
   CLIENT_DATA_T *client;
 
-  for (i=0, client = clients; i<MAX_CLIENTS; i++, client++) {
+  for (i = 0, client = clients; i < MAX_CLIENTS; i++, client++) {
     if (client->fd < 0) {
       return client;
     }
   }
 
   return NULL;
+}
+
+static CLIENT_DATA_T *accept_client(struct sockaddr_in client_addr, int cfd) {
+  CLIENT_DATA_T *client;
+  char client_addr_str[INET_ADDRSTRLEN];
+  int opt_val;
+
+  client_addr_str[0] = 0;
+  inet_ntop(AF_INET, &client_addr.sin_addr, client_addr_str, sizeof(client_addr_str));
+
+  client = find_free_client();
+  if (client == NULL) {
+    syslog(LOG_INFO, "reject connect from host %s, port %u. Maximim client connections exceeded.", client_addr_str, ntohs(client_addr.sin_port));
+    close(cfd);
+    return NULL;
+  }
+
+  syslog(LOG_INFO, "connect from host %s, port %u.", client_addr_str, ntohs(client_addr.sin_port));
+
+  opt_val = 1;
+  setsockopt(cfd, IPPROTO_TCP, TCP_NODELAY, &opt_val, sizeof opt_val);
+
+  memset(client, 0, sizeof(CLIENT_DATA_T));
+  client->fd = cfd;
+  client->addr = client_addr;
+  FD_SET(cfd, main_fds);
+
+  return client;
+}
+
+static void disconnect_client(CLIENT_DATA_T * client) {
+  if (client->fd < 0) {
+    return;
+  }
+
+  close(client->fd);
+  FD_CLR(client->fd, main_fds);
+  client->fd = -1;
+}
+
+static int read_client_data(CLIENT_DATA_T *client) {
+  int i;
+  char rx_buf[RX_BUF_SIZE];
+  char *p;
+  ssize_t rx_len;
+
+  // read data from client
+  rx_len = recv(client->fd, rx_buf, sizeof(rx_buf), 0);
+  if (rx_len < 0) {
+    disconnect_client(client);
+    return -1;
+  }
+
+  // receive data
+  for (i = 0, p = rx_buf; i <rx_len; i++, p++) {
+    if (*p == '\b') {
+      if (client->rx_buf_pos > 0) {
+        (client->rx_buf_pos)--;
+      }
+      continue;
+    }
+
+    if (*p == '\r') {
+      continue;
+    }
+
+    if (*p == '\n') {
+      client->rx_buf[client->rx_buf_pos] = 0;
+      client->rx_buf_pos = 0;
+      handle_client_data(client);
+      continue;
+    }
+
+    if (client->rx_buf_pos < (RX_BUF_SIZE - 1)) {
+      client->rx_buf[(client->rx_buf_pos)++] = *p;
+    }
+  }
+
+  return 0;
 }
 
 static void handle_client_data(CLIENT_DATA_T *client) {
@@ -167,6 +250,8 @@ int nmeasrv_init(fd_set *fds) {
   int i;
   CLIENT_DATA_T *client;
 
+  main_fds = fds;
+
   server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0) {
     syslog(LOG_ERR, "Could not create socket");
@@ -191,8 +276,8 @@ int nmeasrv_init(fd_set *fds) {
     goto fail1;
   }
 
-  FD_SET(server_fd, fds);
-  for (i=0, client = clients; i<MAX_CLIENTS; i++, client++) {
+  FD_SET(server_fd, main_fds);
+  for (i = 0, client = clients; i < MAX_CLIENTS; i++, client++) {
     memset(client, 0, sizeof(CLIENT_DATA_T));
     client->fd = -1;
   }
@@ -210,7 +295,7 @@ void nmeasrv_cleanup() {
   CLIENT_DATA_T *client;
 
   // close client connections
-  for (i=0, client = clients; i<MAX_CLIENTS; i++, client++) {
+  for (i=0, client = clients; i < MAX_CLIENTS; i++, client++) {
     if (client->fd >= 0) {
       close(client->fd);
     }
@@ -220,17 +305,12 @@ void nmeasrv_cleanup() {
   close(server_fd);
 }
 
-int nmeasrv_task(fd_set *fds, fd_set *select_fds) {
-  int i, j;
+int nmeasrv_task(fd_set *select_fds) {
+  int i;
   CLIENT_DATA_T *client;
   int cfd;
   struct sockaddr_in client_addr;
   socklen_t client_addr_size;
-  char client_addr_str[INET_ADDRSTRLEN];
-  int opt_val;
-  char rx_buf[RX_BUF_SIZE];
-  char *p;
-  ssize_t rx_len;
 
   // handle new connections
   if (FD_ISSET(server_fd, select_fds)) {
@@ -241,59 +321,13 @@ int nmeasrv_task(fd_set *fds, fd_set *select_fds) {
       return -1;
     }
 
-    client_addr_str[0] = 0;
-    inet_ntop(AF_INET, &client_addr.sin_addr, client_addr_str, sizeof(client_addr_str));
-
-    client = find_free_client();
-    if (client == NULL) {
-      syslog(LOG_INFO, "reject connect from host %s, port %u. Maximim client connections exceeded.", client_addr_str, ntohs(client_addr.sin_port));
-      close(cfd);
-    } else {
-      syslog(LOG_INFO, "connect from host %s, port %u.", client_addr_str, ntohs(client_addr.sin_port));
-
-      opt_val = 1;
-      setsockopt(cfd, IPPROTO_TCP, TCP_NODELAY, &opt_val, sizeof opt_val);
-
-      memset(client, 0, sizeof(CLIENT_DATA_T));
-      client->fd = cfd;
-      client->addr = client_addr;
-      FD_SET(cfd, fds);
-    }
+    accept_client(client_addr, cfd);
   }
 
   // process clients
-  for (i=0, client = clients; i<MAX_CLIENTS; i++, client++) {
+  for (i = 0, client = clients; i < MAX_CLIENTS; i++, client++) {
     if (client->fd >= 0 && FD_ISSET(client->fd, select_fds)) {
-      // read data from client
-      rx_len = read(client->fd, rx_buf, sizeof(rx_buf));
-      if (rx_len > 0) {
-        // receive data
-        for (j = 0, p = rx_buf; j <rx_len; j++, p++) {
-          if (*p == '\b') {
-            if (client->rx_buf_pos > 0) {
-              (client->rx_buf_pos)--;
-            }
-            continue;
-          }
-          if (*p == '\r') {
-            continue;
-          }
-          if (*p == '\n') {
-            client->rx_buf[client->rx_buf_pos] = 0;
-            client->rx_buf_pos = 0;
-            handle_client_data(client);
-            continue;
-          }
-          if (client->rx_buf_pos < (RX_BUF_SIZE - 1)) {
-            client->rx_buf[(client->rx_buf_pos)++] = *p;
-          }
-        }
-      } else {
-        // close connection
-        close(client->fd);
-        FD_CLR(client->fd, fds);
-        client->fd = -1;
-      }
+      read_client_data(client);
     }
   }
 
@@ -338,9 +372,11 @@ int nmeasrv_broadcast(const char *fmt, ...) {
   len += sprintf(p, "*%02X\n", cs);
 
   // send to all clients
-  for (i=0, client = clients; i<MAX_CLIENTS; i++, client++) {
+  for (i = 0, client = clients; i < MAX_CLIENTS; i++, client++) {
     if (client->fd >= 0) {
-      write(client->fd, msg, len);
+      if (send(client->fd, msg, len, MSG_NOSIGNAL) < 0) {
+        disconnect_client(client);
+      }
     }
   }
 

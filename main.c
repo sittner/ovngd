@@ -18,6 +18,7 @@
 #include "baro.h"
 #include "ahrs.h"
 
+static fd_set main_fds;
 static int exit_fd;
 
 static void sighandler(int sig)
@@ -60,7 +61,7 @@ int main(int argc, char* argv[]) {
   int ret = 1;
   int err;
   struct sigaction act;
-  fd_set fds, select_fds;
+  fd_set select_fds;
   uint64_t u;
   OVNGD_CONF_T conf;
 
@@ -70,14 +71,14 @@ int main(int argc, char* argv[]) {
   // try to read eeprom data
   eeprom_init(conf.eeprom_path);
 
-  FD_ZERO(&fds);
+  FD_ZERO(&main_fds);
 
   exit_fd = eventfd(0, 0);
   if (exit_fd < 0) {
-    fprintf(stderr, "ERROR: unable to create exit event fd.\n");
+    syslog(LOG_ERR, "unable to create exit event fd.");
     goto fail;
   }
-  FD_SET(exit_fd, &fds);
+  FD_SET(exit_fd, &main_fds);
 
   memset(&act, 0, sizeof(act));
   act.sa_handler = &sighandler;
@@ -85,7 +86,7 @@ int main(int argc, char* argv[]) {
   sigaction(SIGTERM, &act, NULL);
   sigaction(SIGHUP, &act, NULL);
 
-  if (oviio_init(&fds, &callbacks, 1000)) {
+  if (oviio_init(&main_fds, &callbacks, 1000)) {
     goto fail_exit_fd;
   }
 
@@ -93,11 +94,11 @@ int main(int argc, char* argv[]) {
   if (conf.temp_id[0] != 0) {
     ovow_temp_add(conf.temp_id, "T", proc_ow_temp);
   }
-  if (ovow_temp_start(&fds)) {
+  if (ovow_temp_start(&main_fds)) {
     goto fail_ovow_temp;
   }
 
-  if (nmeasrv_init(&fds)) {
+  if (nmeasrv_init(&main_fds)) {
     goto fail_ovow_temp;
   }
 
@@ -105,14 +106,14 @@ int main(int argc, char* argv[]) {
   ahrs_init(&conf.ahrs);
 
   while (1) {
-    select_fds = fds;
+    select_fds = main_fds;
 
     err = select(FD_SETSIZE, &select_fds, NULL, NULL, NULL);
     if (err < 0) {
       if (errno == EINTR) {
         continue;
       }
-      fprintf(stderr, "ERROR: Failed on select.\n");
+      syslog(LOG_ERR, "Failed on select.");
       goto fail_nmea_server;
     }
 
@@ -123,13 +124,13 @@ int main(int argc, char* argv[]) {
 
     err = oviio_task(&select_fds);
     if (err < 0) {
-      fprintf(stderr, "ERROR: Failed to process IIO data.\n");
+      syslog(LOG_ERR, "Failed to process IIO data.");
       goto fail_nmea_server;
     }
 
     ovow_temp_task(&select_fds);
 
-    err = nmeasrv_task(&fds, &select_fds);
+    err = nmeasrv_task(&select_fds);
     if (err < 0) {
       goto fail_nmea_server;
     }
