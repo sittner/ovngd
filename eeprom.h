@@ -4,9 +4,11 @@
 #include <stdint.h>
 
 #include "baro.h"
+#include "ahrs.h"
 
 typedef struct {
   BARO_EEPROM_T baro;
+  AHRS_EEPROM_T ahrs;
 } EEPROM_PAYLOAD_T;
 
 typedef struct {

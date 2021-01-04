@@ -43,8 +43,6 @@ void cfInit(CF_DATA_T *cf);
 bool cfSetGainAcc(CF_DATA_T *cf, double gain);
 bool cfSetGainMag(CF_DATA_T *cf, double gain);
 bool cfSetBiasAlpha(CF_DATA_T *cf, double bias_alpha);
-void cfSetDoBiasEstimation(CF_DATA_T *cf, bool do_bias_estimation);
-void cfSetDoAdaptiveGain(CF_DATA_T *cf, bool do_adaptive_gain);
 
 // Set the orientation, as a Hamilton Quaternion, of the body frame wrt the
 // fixed frame.

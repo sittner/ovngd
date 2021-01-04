@@ -216,7 +216,7 @@ void cfInit(CF_DATA_T *cf) {
   cf->gain_mag = 0.01;
   cf->bias_alpha = 0.01;
   cf->do_bias_estimation = true;
-  cf->do_adaptive_gain = false;
+  cf->do_adaptive_gain = true;
   cf->initialized = false;
   cf->steady_state = false;
   quaternion_init(&cf->pos);

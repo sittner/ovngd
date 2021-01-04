@@ -14,6 +14,12 @@ typedef struct {
 
 typedef struct {
   int send_raw;
+  int use_mag;
+  double flt_gain_acc;
+  double flt_gain_mag;
+  double flt_bias_alpha;
+  int flt_do_bias_estim;
+  int flt_do_adaptive_gain;
 } AHRS_CONF_T;
 
 typedef struct {

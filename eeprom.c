@@ -9,6 +9,7 @@
 #include "eeprom.h"
 #include "cfgfile.h"
 #include "baro.h"
+#include "ahrs.h"
 
 EEPROM_DATA_T eeprom_data;
 
@@ -66,6 +67,7 @@ int eeprom_init(const char *dev) {
 
 fail0:
   baro_eeprom_init();
+  ahrs_eeprom_init();
   return 1;
 }
 

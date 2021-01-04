@@ -22,7 +22,13 @@ static const OVNGD_CONF_T default_conf = {
   },
 
   .ahrs = {
-    .send_raw = 0
+    .send_raw = 0,
+    .use_mag = 0,
+    .flt_gain_acc = 0.01,
+    .flt_gain_mag = 0.01,
+    .flt_bias_alpha = 0.01,
+    .flt_do_bias_estim = 1,
+    .flt_do_adaptive_gain = 0
   }
 };
 
@@ -110,6 +116,30 @@ void cfgfile_read(OVNGD_CONF_T *conf, const char *filename) {
     }
     if (strcmp(name, "AHRS_SEND_RAW") == 0) {
       conf->ahrs.send_raw = !!atoi(value);
+      continue;
+    }
+    if (strcmp(name, "AHRS_USE_MAG") == 0) {
+      conf->ahrs.use_mag = !!atoi(value);
+      continue;
+    }
+    if (strcmp(name, "AHRS_FLT_GAIN_ACC") == 0) {
+      conf->ahrs.flt_gain_acc = atof(value);
+      continue;
+    }
+    if (strcmp(name, "AHRS_FLT_GAIN_MAG") == 0) {
+      conf->ahrs.flt_gain_mag = atof(value);
+      continue;
+    }
+    if (strcmp(name, "AHRS_FLT_BIAS_ALPHA") == 0) {
+      conf->ahrs.flt_bias_alpha = atof(value);
+      continue;
+    }
+    if (strcmp(name, "AHRS_FLT_DO_BIAS_ESTIM") == 0) {
+      conf->ahrs.flt_do_bias_estim = !!atoi(value);
+      continue;
+    }
+    if (strcmp(name, "AHRS_FLT_DO_ADAPTIVE_GAIN") == 0) {
+      conf->ahrs.flt_do_adaptive_gain = !!atoi(value);
       continue;
     }
   }

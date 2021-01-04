@@ -2,49 +2,55 @@
 #include "vector.h"
 #include "ovng_iio.h"
 #include "nmea_server.h"
+#include "eeprom.h"
+#include "complementary_filter.h"
 
 #include <math.h>
-
-#include "complementary_filter.h"
 
 #define A_TO_G (1.0 / CF_GRAVITY)
 #define SAMPLE_PERIOD (1.0 / (double) IIO_SAMPLE_FREQ)
 
-// https://wiki.paparazziuav.org/wiki/ImuCalibration
-// https://github.com/shannon112/imu_calibration
-// https%3A%2F%2Fwww.evernote.com%2Fshard%2Fs315%2Fsh%2F988c52e5-8ad9-405e-a416-c2c17d7996ef%2F65b6d82d47a45cdd&title=%255BIMU%255D%2Bcalibration%2BRazor-AHRS%252Frazor-9dof-ahrs
-
-static int send_raw; // send raw data
-static vector3d_t a, w, m; // raw input values
+static int send_raw;
+static int use_mag;
+static vector3d_t a, w, m;
 static double gload;
 static CF_DATA_T filter;
 
 void ahrs_init(const AHRS_CONF_T *conf) {
   send_raw = conf->send_raw;
+  use_mag = conf->use_mag;
+
+  cfInit(&filter);
+  cfSetGainAcc(&filter, conf->flt_gain_acc);
+  cfSetGainMag(&filter, conf->flt_gain_mag);
+  cfSetBiasAlpha(&filter, conf->flt_bias_alpha);
+  filter.do_bias_estimation = conf->flt_do_bias_estim;
+  filter.do_adaptive_gain = conf->flt_do_adaptive_gain;
 
   vector3d_init(&a);
   vector3d_init(&w);
   vector3d_init(&m);
 
-  cfInit(&filter);
-
   gload = 0.0;
 }
 
-void ahrs_accel_data(vector3d_t data) {
-  a = data;
+void ahrs_eeprom_init(void) {
+  eeprom_data.payload.ahrs.mag.is_calibrated = 0;
+  vector3d_init(&eeprom_data.payload.ahrs.mag.offset);
+  vector3d_init(&eeprom_data.payload.ahrs.mag.scale);
+}
 
-  // TODO: offset/scale calib
+void ahrs_accel_data(vector3d_t data) {
+  // gravity from sensor has wrong sign
+  a = vector3d_scale(data, -1.0);
 
   // set gload
   double mag = vector3d_mag(data);
-  gload = A_TO_G * ((data.z < 0.0) ? -mag : mag);
+  gload = A_TO_G * ((data.z > 0.0) ? -mag : mag);
 }
 
 void ahrs_anglvel_data(vector3d_t data) {
-  // TODO: offset calib
-  // TODO: why negative??
-  w = vector3d_scale(data, -1.0);
+  w = data;
 }
 
 void ahrs_magn_data(vector3d_t data) {
@@ -52,6 +58,8 @@ void ahrs_magn_data(vector3d_t data) {
 }
 
 void ahrs_scan_done(void) {
+  euler_t pos;
+
   if (send_raw) {
     nmeasrv_broadcast("$POV,A,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f",
       a.x, a.y, a.z,
@@ -59,20 +67,30 @@ void ahrs_scan_done(void) {
       m.x, m.y, m.z);
   }
 
-  //cfUpdate(&filter, a, w, SAMPLE_PERIOD);
-  cfUpdateMag(&filter, a, w, m, SAMPLE_PERIOD);
+  // TODO: calib
+  m.x -= -0.16484125796073398;
+  m.y -= 1.5590524173068059;
+  m.z -= 0.743568626691612;
+  m.x *= 2.808417093883004;
+  m.y *= 2.395012310446472;
+  m.z *= 2.530159027542372;
+  eeprom_data.payload.ahrs.mag.is_calibrated = 1;
 
-  quaternion_t pos = cfGetOrientation(&filter);
-
-  // TODO
-  double roll = atan2(pos.q0*pos.q1 + pos.q2*pos.q3, 0.5 - pos.q1*pos.q1 - pos.q2*pos.q2);
-  double pitch = asin(-2.0 * (pos.q1*pos.q3 - pos.q0*pos.q2));
-  double yaw = atan2(pos.q1*pos.q2 + pos.q0*pos.q3, 0.5 - pos.q2*pos.q2 - pos.q3*pos.q3);
-
-  nmeasrv_broadcast("$POV,b,%0.2f,p,%0.2f,h,%0.2f,g,%0.2f",
-    roll * RAD_TO_DEGREE,
-    pitch * RAD_TO_DEGREE,
-    yaw * RAD_TO_DEGREE,
-    gload);
+  if (use_mag && eeprom_data.payload.ahrs.mag.is_calibrated) {
+    cfUpdateMag(&filter, a, w, m, SAMPLE_PERIOD);
+    pos = quaternion_to_euler(cfGetOrientation(&filter));
+    nmeasrv_broadcast("$POV,b,%0.2f,p,%0.2f,h,%0.2f,g,%0.2f",
+      pos.roll * RAD_TO_DEGREE,
+      pos.pitch * RAD_TO_DEGREE,
+      pos.yaw * RAD_TO_DEGREE,
+      gload);
+  } else {
+    cfUpdate(&filter, a, w, SAMPLE_PERIOD);
+    pos = quaternion_to_euler(cfGetOrientation(&filter));
+    nmeasrv_broadcast("$POV,b,%0.2f,p,%0.2f,g,%0.2f",
+      pos.roll * RAD_TO_DEGREE,
+      pos.pitch * RAD_TO_DEGREE,
+      gload);
+  }
 }
 
