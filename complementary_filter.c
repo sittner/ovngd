@@ -40,7 +40,7 @@ static const double kDeltaAngularVelocityThreshold = 0.01;
 
 static quaternion_t scaleQuaternion(double gain, quaternion_t q)
 {
-  if (q.q0 < 0.0) { //0.9
+  if (q.q0 < 0.9) {
     // Slerp (Spherical linear interpolation):
     double angle = acos(q.q0);
     double A = sin(angle * (1.0 - gain)) / sin(angle);
@@ -105,6 +105,21 @@ quaternion_t getPrediction(CF_DATA_T *cf, vector3d_t w, double dt)
   return quaternion_normalize(pred);
 }
 
+static quaternion_t getMeasurement(vector3d_t a)
+{
+  // q_acc is the quaternion obtained from the acceleration vector representing
+  // the orientation of the Global frame wrt the Local frame with arbitrary yaw
+  // (intermediary frame). q3_acc is defined as 0.
+  // this is basically an optimized version of quaternion_from_vectors
+  // for the special case of u=q and v={0.0,0.0,1.0}
+  quaternion_t meas;
+  meas.q0 = vector3d_mag(a) + a.z;
+  meas.q1 = -a.y;
+  meas.q2 = a.x;
+  meas.q3 = 0.0;
+  return meas;
+}
+
 static quaternion_t getAccCorrection(vector3d_t a, quaternion_t p)
 {
   // Normalize acceleration vector.
@@ -116,12 +131,7 @@ static quaternion_t getAccCorrection(vector3d_t a, quaternion_t p)
   g = vector3d_rotate_by_quaternion(a, quaternion_invert(p));
 
   // Delta quaternion that rotates the predicted gravity into the real gravity:
-  quaternion_t dq;
-  dq.q0 =  sqrt((g.z + 1.0) * 0.5);
-  dq.q1 = -g.y / (2.0 * dq.q0);
-  dq.q2 =  g.x / (2.0 * dq.q0);
-  dq.q3 =  0.0;
-  return dq;
+  return getMeasurement(g);
 }
 
 static quaternion_t getMagCorrection(vector3d_t m, quaternion_t p)
@@ -164,55 +174,12 @@ static double getAdaptiveGain(double alpha, vector3d_t a)
   return factor * alpha;
 }
 
-static quaternion_t getMeasurement(vector3d_t a)
-{
-  // q_acc is the quaternion obtained from the acceleration vector representing
-  // the orientation of the Global frame wrt the Local frame with arbitrary yaw
-  // (intermediary frame). q3_acc is defined as 0.
-
-  // Normalize acceleration vector.
-  a = vector3d_normalize(a);
-
-  quaternion_t meas;
-  if (a.z >=0) {
-    double X = sqrt((a.z + 1.0) * 0.5);
-    meas.q0 = X;
-    meas.q1 = -a.y / (2.0 * X);
-    meas.q2 = a.x / (2.0 * X);
-    meas.q3 = 0.0;
-  } else {
-    double X = sqrt((1.0 - a.z) * 0.5);
-    meas.q0 = -a.y / (2.0 * X);
-    meas.q1 = X;
-    meas.q2 = 0.0;
-    meas.q3 = a.x / (2.0 * X);
-  }
-
-  return meas;
-}
-
 static quaternion_t getMeasurementMag(vector3d_t a, vector3d_t m)
 {
   // q_acc is the quaternion obtained from the acceleration vector representing
   // the orientation of the Global frame wrt the Local frame with arbitrary yaw
   // (intermediary frame). q3_acc is defined as 0.
-  quaternion_t acc;
-
-  // Normalize acceleration vector.
-  a = vector3d_normalize(a);
-  if (a.z >= 0) {
-    double X = sqrt((a.z + 1.0) * 0.5);
-    acc.q0 = X;
-    acc.q1 = -a.y / (2.0 * X);
-    acc.q2 = a.x / (2.0 * X);
-    acc.q3 = 0.0;
-  } else {
-    double X = sqrt((1.0 - a.z) * 0.5);
-    acc.q0 = -a.y / (2.0 * X);
-    acc.q1 = X;
-    acc.q2 = 0.0;
-    acc.q3 = a.x / (2.0 * X);
-  }
+  quaternion_t acc = getMeasurement(a);
 
   // [lx, ly, lz] is the magnetic field reading, rotated into the intermediary
   // frame by the inverse of q_acc.
@@ -322,11 +289,9 @@ void cfUpdate(CF_DATA_T *cf, vector3d_t a, vector3d_t w, double dt)
   quaternion_t acc;
   acc = getAccCorrection(a, pred);
 
-  double gain;
+  double gain = cf->gain_acc;
   if (cf->do_adaptive_gain) {
     gain = getAdaptiveGain(cf->gain_acc, a);
-  } else {
-    gain = cf->gain_acc;
   }
 
   acc = scaleQuaternion(gain, acc);
