@@ -6,7 +6,7 @@
 #define DEGREE_TO_RAD (M_PI / 180.0)
 #define RAD_TO_DEGREE (180.0 / M_PI)
 
-#define SQRT_2 (1.4142135623730950488)
+#define SQRT_2 (sqrt(2.0))
 
 typedef struct {
   double x;
@@ -21,6 +21,12 @@ typedef struct {
   double q3;
 } quaternion_t;
 
+typedef struct {
+  double roll;
+  double pitch;
+  double yaw;
+} euler_t;
+
 static inline void vector3d_init(vector3d_t *d)
 {
   d->x = 0.0;
@@ -31,6 +37,15 @@ static inline void vector3d_init(vector3d_t *d)
 static inline double vector3d_dot_product(vector3d_t a, vector3d_t b)
 {
   return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+static inline vector3d_t vector3d_cross_product(vector3d_t a, vector3d_t b)
+{
+  vector3d_t r;
+  r.x = (a.y * b.z) - (a.z * b.y);
+  r.y = (a.z * b.x) - (a.x * b.z);
+  r.z = (a.x * b.y) - (a.y * b.x);
+  return r;
 }
 
 static inline double vector3d_mag(vector3d_t v)
@@ -105,6 +120,20 @@ static inline quaternion_t quaternion_multiply(quaternion_t p, quaternion_t q)
   return r;
 }
 
+static inline quaternion_t quaternion_from_vectors(vector3d_t u, vector3d_t v)
+{
+  vector3d_t cp = vector3d_cross_product(u, v);
+  double mu = vector3d_mag(u);
+  double mv = vector3d_mag(v);
+
+  quaternion_t r;
+  r.q0 = sqrt(mu * mu * mv * mv) + vector3d_dot_product(u, v);
+  r.q1 = cp.x;
+  r.q2 = cp.y;
+  r.q3 = cp.z;
+  return quaternion_normalize(r);
+}
+
 static inline vector3d_t vector3d_rotate_by_quaternion(vector3d_t v, quaternion_t q)
 {
   vector3d_t r;
@@ -112,6 +141,25 @@ static inline vector3d_t vector3d_rotate_by_quaternion(vector3d_t v, quaternion_
   r.y = 2.0 * (q.q1 * q.q2 + q.q0 * q.q3) * v.x + (q.q0 * q.q0 - q.q1 * q.q1 + q.q2 * q.q2 - q.q3 * q.q3) * v.y + 2.0 * (q.q2 * q.q3 - q.q0 * q.q1) * v.z;
   r.z = 2.0 * (q.q1 * q.q3 - q.q0 * q.q2) * v.x + 2.0 * (q.q2 * q.q3 + q.q0 * q.q1) * v.y + (q.q0 * q.q0 - q.q1 * q.q1 - q.q2 * q.q2 + q.q3 * q.q3) * v.z;
   return r;
+}
+
+static inline euler_t quaternion_to_euler(quaternion_t q)
+{
+  euler_t e;
+
+  double sinp = 2.0 * (q.q0 * q.q2 - q.q3 * q.q1);
+  if (sinp <= -1.0) {
+    e.pitch = -(M_PI / 2.0);
+  } else if (sinp >= 1.0) {
+    e.pitch = M_PI / 2.0;
+  } else {
+    e.pitch = asin(sinp);
+  }
+
+  e.roll = atan2(q.q0 * q.q1 + q.q2 * q.q3, 0.5 - (q.q1 * q.q1 + q.q2 * q.q2));
+  e.yaw = atan2(q.q0 * q.q3 + q.q1 * q.q2, 0.5 - (q.q2 * q.q2 + q.q3 * q.q3));
+
+  return e;
 }
 
 #endif
