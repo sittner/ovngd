@@ -97,7 +97,7 @@ static void calib_finish(void) {
 
   // check result
   if (fabs(stat_offset) > MAX_OFFSET_BARO || fabs(tek_offset) > MAX_OFFSET_BARO || fabs(dyn_offset) > MAX_OFFSET_DIFF) {
-    nmeasrv_broadcast("$POV,M,C,B,F,%f,%f,%f,%f", calib_baro_ref, stat_offset, tek_offset, dyn_offset);
+    nmeasrv_broadcast("$POVCAL,B,R,0,%f,%f,%f,%f", calib_baro_ref, stat_offset, tek_offset, dyn_offset);
     syslog(LOG_ERR, "Baro calibration offset verification failed.");
     return;
   }
@@ -109,7 +109,7 @@ static void calib_finish(void) {
 
   eeprom_save();
   syslog(LOG_INFO, "Baro calibration results saved to EEPROM.");
-  nmeasrv_broadcast("$POV,M,C,B,A,%f,%f,%f,%f", calib_baro_ref, stat_offset, tek_offset, dyn_offset);
+  nmeasrv_broadcast("$POVCAL,B,R,1,%f,%f,%f,%f", calib_baro_ref, stat_offset, tek_offset, dyn_offset);
 }
 
 static double computeNoncompVario(double pressure, double d_pressure) {

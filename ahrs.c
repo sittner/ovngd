@@ -75,7 +75,6 @@ void ahrs_scan_done(void) {
   m.x *= 2.808417093883004;
   m.y *= 2.395012310446472;
   m.z *= 2.530159027542372;
-  eeprom_data.payload.ahrs.mag.is_calibrated = 1;
 
   mag_yaw = use_mag && eeprom_data.payload.ahrs.mag.is_calibrated;
   if (mag_yaw) {

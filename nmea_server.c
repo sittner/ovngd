@@ -137,7 +137,7 @@ static int read_client_data(CLIENT_DATA_T *client) {
 
 static void handle_client_data(CLIENT_DATA_T *client) {
   char *line = client->rx_buf;
-  char *pos, *tok;
+  char *pos;
   unsigned char csum_rx, csum;
   char *type;
 
@@ -167,22 +167,15 @@ static void handle_client_data(CLIENT_DATA_T *client) {
     return;
   }
 
-  // check message prefix
-  pos = line;
-  tok = next_token(&pos);
-  if (tok == NULL || strcmp(tok, "POV") != 0) {
-    return;
-  }
-
-  // get type
-  type = next_token(&pos);
+  // check type
+  type = next_token(&line);
   if (type == NULL) {
     return;
   }
 
   // dispatch types
-  if (strcmp(type, "C") == 0) {
-    handle_client_data_calib(client, pos);
+  if (strcmp(type, "POVCAL") == 0) {
+    handle_client_data_calib(client, line);
     return;
   }
 }
@@ -204,27 +197,37 @@ static void handle_client_data_calib(CLIENT_DATA_T *client, char *pos) {
 }
 
 static void handle_client_data_calib_baro(CLIENT_DATA_T *client, char *pos) {
+  char *subtype;
   char *s;
   int baro_autoref;
   double baro_ref;
 
-  // get baro_ref
-  s = next_token(&pos);
-  if (s == NULL) {
-    // use autoref
-    baro_autoref = 1;
-    baro_ref = 0.0;
-  } else {
-    // verify baro_ref
-    baro_autoref = 0;
-    baro_ref = atof(s);
-    if (baro_ref < BARO_REF_MIN || baro_ref > BARO_REF_MAX) {
-      return;
-    }
+  // get command
+  subtype = next_token(&pos);
+  if (subtype == NULL) {
+    return;
   }
 
-  // start calibration
-  baro_start_calib(baro_autoref, baro_ref);
+  // dispatch commands
+  if (strcmp(subtype, "S") == 0) {
+    // get baro_ref
+    s = next_token(&pos);
+    if (s == NULL) {
+      // use autoref
+      baro_autoref = 1;
+      baro_ref = 0.0;
+    } else {
+      // verify baro_ref
+      baro_autoref = 0;
+      baro_ref = atof(s);
+      if (baro_ref < BARO_REF_MIN || baro_ref > BARO_REF_MAX) {
+        return;
+      }
+    }
+
+    // start calibration
+    baro_start_calib(baro_autoref, baro_ref);
+  }
 }
 
 static char *next_token(char **pos) {
