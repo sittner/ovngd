@@ -59,9 +59,10 @@ void ahrs_magn_data(vector3d_t data) {
 
 void ahrs_scan_done(void) {
   euler_t pos;
+  int mag_yaw;
 
   if (send_raw) {
-    nmeasrv_broadcast("$POV,A,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f",
+    nmeasrv_broadcast("$POVIMU,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f,%0.5f",
       a.x, a.y, a.z,
       w.x, w.y, w.z,
       m.x, m.y, m.z);
@@ -76,21 +77,18 @@ void ahrs_scan_done(void) {
   m.z *= 2.530159027542372;
   eeprom_data.payload.ahrs.mag.is_calibrated = 1;
 
-  if (use_mag && eeprom_data.payload.ahrs.mag.is_calibrated) {
+  mag_yaw = use_mag && eeprom_data.payload.ahrs.mag.is_calibrated;
+  if (mag_yaw) {
     cfUpdateMag(&filter, a, w, m, SAMPLE_PERIOD);
-    pos = quaternion_to_euler(cfGetOrientation(&filter));
-    nmeasrv_broadcast("$POV,b,%0.2f,p,%0.2f,h,%0.2f,g,%0.2f",
-      pos.roll * RAD_TO_DEGREE,
-      pos.pitch * RAD_TO_DEGREE,
-      pos.yaw * RAD_TO_DEGREE,
-      gload);
   } else {
     cfUpdate(&filter, a, w, SAMPLE_PERIOD);
-    pos = quaternion_to_euler(cfGetOrientation(&filter));
-    nmeasrv_broadcast("$POV,b,%0.2f,p,%0.2f,g,%0.2f",
-      pos.roll * RAD_TO_DEGREE,
-      pos.pitch * RAD_TO_DEGREE,
-      gload);
   }
+
+  pos = quaternion_to_euler(cfGetOrientation(&filter));
+  nmeasrv_broadcast("$POVAHRS,%0.2f,%0.2f,%0.2f,%d,%0.2f",
+    pos.roll * RAD_TO_DEGREE,
+    pos.pitch * RAD_TO_DEGREE,
+    pos.yaw * RAD_TO_DEGREE,
+    mag_yaw, gload);
 }
 
