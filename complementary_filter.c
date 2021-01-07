@@ -217,6 +217,10 @@ void cfInit(CF_DATA_T *cf) {
   cf->bias_alpha = 0.01;
   cf->do_bias_estimation = true;
   cf->do_adaptive_gain = true;
+  cfReset(cf);
+}
+
+void cfReset(CF_DATA_T *cf) {
   cf->initialized = false;
   cf->steady_state = false;
   quaternion_init(&cf->pos);

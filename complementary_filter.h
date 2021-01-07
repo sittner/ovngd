@@ -39,6 +39,7 @@ typedef struct {
 } CF_DATA_T;
 
 void cfInit(CF_DATA_T *cf);
+void cfReset(CF_DATA_T *cf);
 
 bool cfSetGainAcc(CF_DATA_T *cf, double gain);
 bool cfSetGainMag(CF_DATA_T *cf, double gain);

@@ -16,6 +16,9 @@ static vector3d_t a, w, m;
 static double gload;
 static CF_DATA_T filter;
 
+static vector3d_t mag_os;
+static vector3d_t mag_map[3];
+
 void ahrs_init(const AHRS_CONF_T *conf) {
   send_raw = conf->send_raw;
   use_mag = conf->use_mag;
@@ -30,6 +33,11 @@ void ahrs_init(const AHRS_CONF_T *conf) {
   vector3d_init(&a);
   vector3d_init(&w);
   vector3d_init(&m);
+
+  vector3d_init(&mag_os);
+  vector3d_set(&mag_map[0], 1.0, 0.0, 0.0);
+  vector3d_set(&mag_map[1], 0.0, 1.0, 0.0);
+  vector3d_set(&mag_map[2], 0.0, 0.0, 1.0);
 
   gload = 0.0;
 }
@@ -69,14 +77,17 @@ void ahrs_scan_done(void) {
   }
 
   // TODO: calib
-  m.x -= -0.16484125796073398;
-  m.y -= 1.5590524173068059;
-  m.z -= 0.743568626691612;
-  m.x *= 2.808417093883004;
-  m.y *= 2.395012310446472;
-  m.z *= 2.530159027542372;
+//  m.x -= -0.16484125796073398;
+//  m.y -= 1.5590524173068059;
+//  m.z -= 0.743568626691612;
+//  m.x *= 2.808417093883004;
+//  m.y *= 2.395012310446472;
+//  m.z *= 2.530159027542372;
+
+  m = vector3d_rotate_by_matrix(vector3d_sub(m, mag_os), mag_map);
 
   mag_yaw = use_mag && eeprom_data.payload.ahrs.mag.is_calibrated;
+  mag_yaw = 1; // TODO
   if (mag_yaw) {
     cfUpdateMag(&filter, a, w, m, SAMPLE_PERIOD);
   } else {
@@ -89,5 +100,14 @@ void ahrs_scan_done(void) {
     pos.pitch * RAD_TO_DEGREE,
     pos.yaw * RAD_TO_DEGREE,
     mag_yaw, gload);
+}
+
+void ahrs_calib_fusion_reset(void) {
+  cfReset(&filter);
+}
+
+void ahrs_calib_magn(const vector3d_t *os, const vector3d_t *map) {
+  memcpy(&mag_os, os, sizeof(mag_os));
+  memcpy(&mag_map, map, sizeof(mag_map));
 }
 

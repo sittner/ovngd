@@ -14,6 +14,8 @@
 
 #include "nmea_server.h"
 #include "baro.h"
+#include "ahrs.h"
+#include "vector.h"
 
 #define OVNG_PORT 4353
 #define MAX_CLIENTS 16
@@ -38,10 +40,17 @@ static CLIENT_DATA_T *find_free_client();
 static CLIENT_DATA_T *accept_client(struct sockaddr_in client_addr, int cfd);
 static void disconnect_client(CLIENT_DATA_T * client);
 static int read_client_data(CLIENT_DATA_T *client);
+
 static void handle_client_data(CLIENT_DATA_T *client);
-static void handle_client_data_calib(CLIENT_DATA_T *client, char *pos);
-static void handle_client_data_calib_baro(CLIENT_DATA_T *client, char *pos);
+static void handle_client_data_calib(char *pos);
+static void handle_client_data_calib_baro(char *pos);
+static void handle_client_data_calib_baro_start(char *pos);
+static void handle_client_data_calib_ahrs(char *pos);
+static void handle_client_data_calib_ahrs_fusion_reset(char *pos);
+static void handle_client_data_calib_ahrs_mag(char *pos);
+
 static char *next_token(char **pos);
+static int parse_vector(char **pos, vector3d_t *v);
 
 static CLIENT_DATA_T *find_free_client() {
   int i;
@@ -175,12 +184,12 @@ static void handle_client_data(CLIENT_DATA_T *client) {
 
   // dispatch types
   if (strcmp(type, "POVCAL") == 0) {
-    handle_client_data_calib(client, line);
+    handle_client_data_calib(line);
     return;
   }
 }
 
-static void handle_client_data_calib(CLIENT_DATA_T *client, char *pos) {
+static void handle_client_data_calib(char *pos) {
   char *subtype;
 
   // get subtype
@@ -191,16 +200,17 @@ static void handle_client_data_calib(CLIENT_DATA_T *client, char *pos) {
 
   // dispatch subtypes
   if (strcmp(subtype, "B") == 0) {
-    handle_client_data_calib_baro(client, pos);
+    handle_client_data_calib_baro(pos);
+    return;
+  }
+  if (strcmp(subtype, "A") == 0) {
+    handle_client_data_calib_ahrs(pos);
     return;
   }
 }
 
-static void handle_client_data_calib_baro(CLIENT_DATA_T *client, char *pos) {
+static void handle_client_data_calib_baro(char *pos) {
   char *subtype;
-  char *s;
-  int baro_autoref;
-  double baro_ref;
 
   // get command
   subtype = next_token(&pos);
@@ -210,24 +220,76 @@ static void handle_client_data_calib_baro(CLIENT_DATA_T *client, char *pos) {
 
   // dispatch commands
   if (strcmp(subtype, "S") == 0) {
-    // get baro_ref
-    s = next_token(&pos);
-    if (s == NULL) {
-      // use autoref
-      baro_autoref = 1;
-      baro_ref = 0.0;
-    } else {
-      // verify baro_ref
-      baro_autoref = 0;
-      baro_ref = atof(s);
-      if (baro_ref < BARO_REF_MIN || baro_ref > BARO_REF_MAX) {
-        return;
-      }
-    }
-
-    // start calibration
-    baro_start_calib(baro_autoref, baro_ref);
+    handle_client_data_calib_baro_start(pos);
+    return;
   }
+}
+
+static void handle_client_data_calib_baro_start(char *pos) {
+  char *s;
+  int baro_autoref;
+  double baro_ref;
+
+  // get baro_ref
+  s = next_token(&pos);
+  if (s == NULL) {
+    // use autoref
+    baro_autoref = 1;
+    baro_ref = 0.0;
+  } else {
+    // verify baro_ref
+    baro_autoref = 0;
+    baro_ref = atof(s);
+    if (baro_ref < BARO_REF_MIN || baro_ref > BARO_REF_MAX) {
+      return;
+    }
+  }
+
+  // start calibration
+  baro_start_calib(baro_autoref, baro_ref);
+}
+
+static void handle_client_data_calib_ahrs(char *pos) {
+  char *subtype;
+
+  // get command
+  subtype = next_token(&pos);
+  if (subtype == NULL) {
+    return;
+  }
+
+  // dispatch commands
+  if (strcmp(subtype, "I") == 0) {
+    handle_client_data_calib_ahrs_fusion_reset(pos);
+    return;
+  }
+  if (strcmp(subtype, "M") == 0) {
+    handle_client_data_calib_ahrs_mag(pos);
+    return;
+  }
+}
+
+static void handle_client_data_calib_ahrs_fusion_reset(char *pos) {
+  printf("init\n");
+  ahrs_calib_fusion_reset();
+}
+
+static void handle_client_data_calib_ahrs_mag(char *pos) {
+  int i;
+  vector3d_t os;
+  vector3d_t map[3];
+
+  if (!parse_vector(&pos, &os)) {
+    return;
+  }
+  for (i = 0; i < 3; i++) {
+    if (!parse_vector(&pos, &map[i])) {
+      return;
+    }
+  }
+
+  printf("%f %f %f\n", os.x, os.y, os.z);
+  ahrs_calib_magn(&os, map);
 }
 
 static char *next_token(char **pos) {
@@ -247,6 +309,30 @@ static char *next_token(char **pos) {
   }
 
   return val;
+}
+
+static int parse_vector(char **pos, vector3d_t *v) {
+  char *s;
+
+  s = next_token(pos);
+  if (s == NULL) {
+    return 0;
+  }
+  v->x = atof(s);
+
+  s = next_token(pos);
+  if (s == NULL) {
+    return 0;
+  }
+  v->y = atof(s);
+
+  s = next_token(pos);
+  if (s == NULL) {
+    return 0;
+  }
+  v->z = atof(s);
+
+  return 1;
 }
 
 int nmeasrv_init(fd_set *fds) {
@@ -339,7 +425,7 @@ int nmeasrv_task(fd_set *select_fds) {
 
 int nmeasrv_broadcast(const char *fmt, ...) {
   va_list ap;
-  char msg[256];
+  char msg[1024];
   unsigned char cs;
   char *p;
   int len;

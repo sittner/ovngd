@@ -34,6 +34,13 @@ static inline void vector3d_init(vector3d_t *d)
   d->z = 0.0;
 }
 
+static inline void vector3d_set(vector3d_t *d, double x, double y, double z)
+{
+  d->x = x;
+  d->y = y;
+  d->z = z;
+}
+
 static inline double vector3d_dot_product(vector3d_t a, vector3d_t b)
 {
   return a.x * b.x + a.y * b.y + a.z * b.z;
@@ -140,6 +147,15 @@ static inline vector3d_t vector3d_rotate_by_quaternion(vector3d_t v, quaternion_
   r.x = (q.q0 * q.q0 + q.q1 * q.q1 - q.q2 * q.q2 - q.q3 * q.q3) * v.x + 2.0 * (q.q1 * q.q2 - q.q0 * q.q3) * v.y + 2.0 * (q.q1 * q.q3 + q.q0 * q.q2) * v.z;
   r.y = 2.0 * (q.q1 * q.q2 + q.q0 * q.q3) * v.x + (q.q0 * q.q0 - q.q1 * q.q1 + q.q2 * q.q2 - q.q3 * q.q3) * v.y + 2.0 * (q.q2 * q.q3 - q.q0 * q.q1) * v.z;
   r.z = 2.0 * (q.q1 * q.q3 - q.q0 * q.q2) * v.x + 2.0 * (q.q2 * q.q3 + q.q0 * q.q1) * v.y + (q.q0 * q.q0 - q.q1 * q.q1 - q.q2 * q.q2 + q.q3 * q.q3) * v.z;
+  return r;
+}
+
+static inline vector3d_t vector3d_rotate_by_matrix(vector3d_t v, const vector3d_t *matrix)
+{
+  vector3d_t r;
+  r.x = matrix[0].x * v.x + matrix[0].y * v.y + matrix[0].z * v.z;
+  r.y = matrix[1].x * v.x + matrix[1].y * v.y + matrix[1].z * v.z;
+  r.z = matrix[2].x * v.x + matrix[2].y * v.y + matrix[2].z * v.z;
   return r;
 }
 

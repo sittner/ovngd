@@ -24,4 +24,7 @@ void ahrs_magn_data(vector3d_t data);
 
 void ahrs_scan_done(void);
 
+void ahrs_calib_fusion_reset(void);
+void ahrs_calib_magn(const vector3d_t *os, const vector3d_t *map);
+
 #endif
