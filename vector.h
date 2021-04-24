@@ -9,6 +9,12 @@
 #define SQRT_2 (sqrt(2.0))
 
 typedef struct {
+  float x;
+  float y;
+  float z;
+} vector3d_float_t;
+
+typedef struct {
   double x;
   double y;
   double z;
@@ -27,11 +33,25 @@ typedef struct {
   double yaw;
 } euler_t;
 
+static inline void vector3d_float_init(vector3d_float_t *d)
+{
+  d->x = 0.0;
+  d->y = 0.0;
+  d->z = 0.0;
+}
+
 static inline void vector3d_init(vector3d_t *d)
 {
   d->x = 0.0;
   d->y = 0.0;
   d->z = 0.0;
+}
+
+static inline void vector3d_float_set(vector3d_float_t *d, float x, float y, float z)
+{
+  d->x = x;
+  d->y = y;
+  d->z = z;
 }
 
 static inline void vector3d_set(vector3d_t *d, double x, double y, double z)
@@ -81,7 +101,23 @@ static inline vector3d_t vector3d_add(vector3d_t a, vector3d_t b)
   return a;
 }
 
+static inline vector3d_t vector3d_add_float(vector3d_t a, vector3d_float_t b)
+{
+  a.x += b.x;
+  a.y += b.y;
+  a.z += b.z;
+  return a;
+}
+
 static inline vector3d_t vector3d_sub(vector3d_t a, vector3d_t b)
+{
+  a.x -= b.x;
+  a.y -= b.y;
+  a.z -= b.z;
+  return a;
+}
+
+static inline vector3d_t vector3d_sub_float(vector3d_t a, vector3d_float_t b)
 {
   a.x -= b.x;
   a.y -= b.y;
@@ -151,6 +187,15 @@ static inline vector3d_t vector3d_rotate_by_quaternion(vector3d_t v, quaternion_
 }
 
 static inline vector3d_t vector3d_rotate_by_matrix(vector3d_t v, const vector3d_t *matrix)
+{
+  vector3d_t r;
+  r.x = matrix[0].x * v.x + matrix[0].y * v.y + matrix[0].z * v.z;
+  r.y = matrix[1].x * v.x + matrix[1].y * v.y + matrix[1].z * v.z;
+  r.z = matrix[2].x * v.x + matrix[2].y * v.y + matrix[2].z * v.z;
+  return r;
+}
+
+static inline vector3d_t vector3d_rotate_by_matrix_float(vector3d_t v, const vector3d_float_t *matrix)
 {
   vector3d_t r;
   r.x = matrix[0].x * v.x + matrix[0].y * v.y + matrix[0].z * v.z;

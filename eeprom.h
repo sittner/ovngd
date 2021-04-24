@@ -2,6 +2,7 @@
 #define _EEPROM_H_
 
 #include <stdint.h>
+#include <assert.h>
 
 #include "baro.h"
 #include "ahrs.h"

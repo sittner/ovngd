@@ -50,7 +50,7 @@ static void handle_client_data_calib_ahrs_fusion_reset(char *pos);
 static void handle_client_data_calib_ahrs_mag(char *pos);
 
 static char *next_token(char **pos);
-static int parse_vector(char **pos, vector3d_t *v);
+static int parse_vector(char **pos, vector3d_float_t *v);
 
 static CLIENT_DATA_T *find_free_client() {
   int i;
@@ -276,8 +276,8 @@ static void handle_client_data_calib_ahrs_fusion_reset(char *pos) {
 
 static void handle_client_data_calib_ahrs_mag(char *pos) {
   int i;
-  vector3d_t os;
-  vector3d_t map[3];
+  vector3d_float_t os;
+  vector3d_float_t map[3];
 
   if (!parse_vector(&pos, &os)) {
     return;
@@ -311,7 +311,7 @@ static char *next_token(char **pos) {
   return val;
 }
 
-static int parse_vector(char **pos, vector3d_t *v) {
+static int parse_vector(char **pos, vector3d_float_t *v) {
   char *s;
 
   s = next_token(pos);

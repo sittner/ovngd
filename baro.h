@@ -5,9 +5,9 @@
 
 typedef struct {
   int is_calibrated;
-  double stat_offset;
-  double tek_offset;
-  double dyn_offset;
+  float stat_offset;
+  float tek_offset;
+  float dyn_offset;
 } BARO_EEPROM_T;
 
 // config defaults
