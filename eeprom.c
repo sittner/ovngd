@@ -66,6 +66,7 @@ int eeprom_init(const char *dev) {
   return 0;
 
 fail0:
+  eeprom_data.payload.flags = 0;
   baro_eeprom_init();
   ahrs_eeprom_init();
   return 1;

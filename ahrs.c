@@ -6,6 +6,7 @@
 #include "complementary_filter.h"
 
 #include <math.h>
+#include <syslog.h>
 
 #define A_TO_G (1.0 / CF_GRAVITY)
 #define SAMPLE_PERIOD (1.0 / (double) IIO_SAMPLE_FREQ)
@@ -35,7 +36,6 @@ void ahrs_init(const AHRS_CONF_T *conf) {
 }
 
 void ahrs_eeprom_init(void) {
-  eeprom_data.payload.ahrs.mag.is_calibrated = 0;
   vector3d_float_init(&eeprom_data.payload.ahrs.mag.offset);
   vector3d_float_set(&eeprom_data.payload.ahrs.mag.map[0], 1.0, 0.0, 0.0);
   vector3d_float_set(&eeprom_data.payload.ahrs.mag.map[1], 0.0, 1.0, 0.0);
@@ -72,7 +72,7 @@ void ahrs_scan_done(void) {
 
   m = vector3d_rotate_by_matrix_float(vector3d_sub_float(m, eeprom_data.payload.ahrs.mag.offset), eeprom_data.payload.ahrs.mag.map);
 
-  mag_yaw = use_mag && eeprom_data.payload.ahrs.mag.is_calibrated;
+  mag_yaw = use_mag && ((eeprom_data.payload.flags & EE_FLAG_AHRS_IS_CALIBRATED) != 0);
   if (mag_yaw) {
     cfUpdateMag(&filter, a, w, m, SAMPLE_PERIOD);
   } else {
@@ -92,7 +92,11 @@ void ahrs_calib_fusion_reset(void) {
 }
 
 void ahrs_calib_magn(const vector3d_float_t *os, const vector3d_float_t *map) {
+  eeprom_data.payload.flags |= EE_FLAG_AHRS_IS_CALIBRATED;
   memcpy(&eeprom_data.payload.ahrs.mag.offset, os, sizeof(vector3d_float_t));
   memcpy(&eeprom_data.payload.ahrs.mag.map, map, sizeof(vector3d_float_t) * 3);
+
+  eeprom_save();
+  syslog(LOG_INFO, "AHRS calibration results saved to EEPROM.");
 }
 

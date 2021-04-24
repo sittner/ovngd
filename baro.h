@@ -4,7 +4,6 @@
 #include "cfgfile.h"
 
 typedef struct {
-  int is_calibrated;
   float stat_offset;
   float tek_offset;
   float dyn_offset;

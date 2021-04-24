@@ -65,9 +65,6 @@ int main(int argc, char* argv[]) {
   uint64_t u;
   OVNGD_CONF_T conf;
 
-  printf("%ld\n", sizeof(eeprom_data));
-return 0;
-
   // try to read config file
   cfgfile_read(&conf, (argc >= 2) ? argv[1] : NULL);
 

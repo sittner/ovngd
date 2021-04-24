@@ -102,7 +102,7 @@ static void calib_finish(void) {
     return;
   }
 
-  eeprom_data.payload.baro.is_calibrated = 1;
+  eeprom_data.payload.flags |= EE_FLAG_BARO_IS_CALIBRATED;
   eeprom_data.payload.baro.stat_offset = stat_offset;
   eeprom_data.payload.baro.tek_offset = tek_offset;
   eeprom_data.payload.baro.dyn_offset = dyn_offset;
@@ -135,7 +135,6 @@ void baro_start_calib(int baro_autoref, double baro_ref) {
 }
 
 void baro_eeprom_init(void) {
-  eeprom_data.payload.baro.is_calibrated = 0;
   eeprom_data.payload.baro.stat_offset = 0.0;
   eeprom_data.payload.baro.tek_offset = 0.0;
   eeprom_data.payload.baro.dyn_offset = 0.0;
@@ -145,7 +144,7 @@ void baro_stat_data(double data) {
   calib_update(&calib_data[CALIB_STAT], data);
 
   // process only if calibrated
-  if (!eeprom_data.payload.baro.is_calibrated) {
+  if ((eeprom_data.payload.flags & EE_FLAG_BARO_IS_CALIBRATED) == 0) {
     return;
   }
 
@@ -163,7 +162,7 @@ void baro_tek_data(double data) {
   calib_update(&calib_data[CALIB_TEK], data);
 
   // process only if calibrated
-  if (!eeprom_data.payload.baro.is_calibrated) {
+  if ((eeprom_data.payload.flags & EE_FLAG_BARO_IS_CALIBRATED) == 0) {
     return;
   }
 
@@ -186,7 +185,7 @@ void baro_dyn_data(double data) {
   calib_update(&calib_data[CALIB_DYN], data);
 
   // process only if calibrated
-  if (!eeprom_data.payload.baro.is_calibrated) {
+  if ((eeprom_data.payload.flags & EE_FLAG_BARO_IS_CALIBRATED) == 0) {
     return;
   }
 

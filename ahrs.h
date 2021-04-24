@@ -5,7 +5,6 @@
 #include "vector.h"
 
 typedef struct {
-  int is_calibrated;
   vector3d_float_t offset;
   vector3d_float_t map[3];
 } AHRS_MAG_EEPROM_T;
